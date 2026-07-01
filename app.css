@@ -1,0 +1,1179 @@
+:root{
+  --bg:#050705; --bg2:#0a0f0b; --card:#0d130e; --card2:#111a13;
+  --line:#1c2a1f; --text:#d7ecdb; --dim:#7f9686; --accent:#2ee66f; --cyan:#5effa0;
+  --green:#22c55e; --red:#f87171; --orange:#fb923c; --yellow:#fbbf24;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  background:radial-gradient(1200px 800px at 50% -10%, #0c2417 0%, var(--bg) 60%);
+  color:var(--text);overflow:hidden;-webkit-user-select:none;display:flex;flex-direction:column;height:100%}
+.topbar{-webkit-app-region:drag;display:flex;align-items:center;justify-content:space-between;
+  padding:12px 18px;border-bottom:1px solid var(--line);background:rgba(8,11,18,.6);backdrop-filter:blur(10px)}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .b-dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green)}
+.brand b{letter-spacing:.34em;font-size:14px;font-weight:700;font-family:ui-monospace,"SF Mono",Menlo,monospace;color:#7dffb0}
+.brand span{color:var(--dim);font-size:12px;letter-spacing:.04em}
+.modeToggle{position:absolute;left:50%;bottom:46px;transform:translateX(-50%);z-index:6;display:flex;gap:2px;padding:3px;border-radius:999px;background:rgba(10,16,12,.55);border:1px solid var(--line);backdrop-filter:blur(6px)}
+.mt-opt{background:none;border:none;color:var(--dim);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:5px 16px;border-radius:999px;cursor:pointer;transition:all .2s}
+.mt-opt.on{background:rgba(46,230,111,.16);color:#7dffb0;box-shadow:0 0 14px rgba(46,230,111,.18)}
+.mt-opt:not(.on):hover{color:var(--text)}
+body.familyMode .modeToggle .mt-opt.on{background:rgba(94,200,255,.16);color:#9fd8ff;box-shadow:0 0 14px rgba(94,200,255,.18)}
+.tb-ctrl{-webkit-app-region:no-drag;display:flex;gap:8px}
+.tb-ctrl button{background:#0e1a12;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px 11px;font-size:12px;cursor:pointer}
+.tb-ctrl button:hover{background:#16301f}
+
+.stageWrap{flex:1;position:relative;min-height:0}
+.view{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .25s}
+.view.active{opacity:1;pointer-events:auto}
+
+/* ---------- HOME / HUB ---------- */
+#stage{position:absolute;inset:0}
+#links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+#neuro{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.9}
+/* 3D Matrix corridor — back-most layer of the home stage (behind neuro/links/orb/nodes). */
+#corridor{position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;display:block;opacity:1}
+/* Edge vignette — digits fall darker toward the corners, away from Melric + the nodes (the light sources). */
+/* Vignette: a SMOOTH, continuous darkening from the very center outward — no flat
+   transparent zone, so there's no inner ring/"hard line" sitting around Melric. Eased
+   lighter overall so it doesn't crush the background. */
+#stage::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse 120% 105% at 50% 46%,transparent 0%,rgba(0,0,0,.1) 48%,rgba(0,0,0,.34) 80%,rgba(0,0,0,.56) 100%)}
+/* Old 2D perspective tunnel — replaced by #corridor, kept hidden. */
+#matrix{display:none !important}
+.topbar,.stageWrap,.dock{position:relative;z-index:1}
+#links line{stroke:url(#lg);stroke-width:1.5;opacity:0;stroke-dasharray:5 7;animation:none}
+#links line.active{stroke:#5effa0;stroke-width:3;opacity:1;stroke-dasharray:none;animation:none;filter:drop-shadow(0 0 5px #5effa0)}
+.pulseDot{fill:#d8ffe8;filter:drop-shadow(0 0 6px #5effa0)}
+#stage{transition:transform .42s cubic-bezier(.55,0,.3,1),opacity .42s}
+#stage.zoom{opacity:0}
+.node.activating{transform:translate(-50%,-50%) scale(1.16) !important;border-color:#5effa0;box-shadow:0 0 36px rgba(94,255,160,.6)}
+.nodeImg{width:22px;height:22px;object-fit:contain;border-radius:6px;display:block;margin:0 auto}
+@keyframes dash{to{stroke-dashoffset:-400}}
+.orb{position:absolute;transform:translate(-50%,-50%);width:150px;height:150px;border-radius:50%;
+  background:transparent;
+  display:flex;align-items:center;justify-content:center;cursor:default;z-index:3;transition:transform .15s,filter .18s}
+/* HOME BUTTON: the orb only reads as pressable when it actually navigates (tasks mode / a room / an
+   inner view). On the plain home cockpit it does nothing, so no pointer + no hover brighten. */
+.orb.actsHome{cursor:pointer}
+.orb.actsHome:hover{filter:brightness(1.14)}
+.orb.live{box-shadow:none}
+.orb::after{content:'';position:absolute;left:50%;top:50%;width:190%;height:190%;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(120,255,180,.7) 0%,rgba(94,255,160,.28) 30%,rgba(94,255,160,.08) 50%,rgba(94,255,160,0) 70%);mix-blend-mode:screen;animation:radiate 3.6s ease-in-out infinite;pointer-events:none;z-index:-1}
+@keyframes radiate{0%,100%{opacity:.28;transform:translate(-50%,-50%) scale(.82)}50%{opacity:.9;transform:translate(-50%,-50%) scale(1.22)}}
+.orb.thinking{animation:think 1.1s ease-in-out infinite}
+@keyframes think{0%,100%{filter:brightness(1)}50%{filter:brightness(1.55) saturate(1.35)}}
+/* MELRIC — plain readable label: white with a drop shadow so it reads cleanly over the bright nucleus. */
+/* CSS label hidden — MELRIC is now drawn inside the 3D scene (orb3d.js) so the electrons can pass in front of it. */
+.orb .lbl{display:none}
+/* 3D atom: orb3d.js renders the churning plasma nucleus + real 3D orbital rings
+   into this canvas. It overflows the 150px nucleus so orbits/glow extend past it. */
+.orb #orbCanvas{position:absolute;left:50%;top:50%;width:300%;height:300%;transform:translate(-50%,-50%);pointer-events:none;z-index:2;background:transparent}
+/* ===== TASKS MODE: a third dressing of the SAME home stage (Eric 2026-06-12).
+   The ring is hidden, the real orb floats to the TOP, one zoomed-in node sits where the ring was,
+   and the home bands/rails are repointed to streak/team/reconcile + project filters. No reparenting:
+   the live orb is simply translated up via this class. Smooth, fades, no boxes. ===== */
+#stage.tasksmode .node{opacity:0;pointer-events:none;transition:opacity .35s}
+#stage.tasksmode #links,#stage.tasksmode #neuro{opacity:0;transition:opacity .4s}
+/* orb assembly shifts toward the top; layoutHub still sets left/top to the stage centre, this
+   transform lifts it from there. The MELRIC label is hidden in tasks mode (T A S K S replaces it). */
+#stage .orb{transition:transform .15s,top .55s cubic-bezier(.55,0,.3,1)}
+#stage.tasksmode .orb{transform:translate(-50%,-50%) scale(.62);top:16% !important}
+#stage.tasksmode .orb:hover{transform:translate(-50%,-50%) scale(.66)}
+/* the T A S K S wordmark under the lifted orb */
+#tasksLabel{position:absolute;left:50%;top:16%;transform:translate(-50%,46px);z-index:3;
+  font-size:12px;font-weight:800;letter-spacing:.52em;color:#9fe3b6;opacity:0;padding-left:.52em;
+  text-shadow:0 0 16px rgba(46,230,111,.35),0 1px 6px rgba(0,0,0,.9);pointer-events:none;
+  transition:opacity .5s .15s,top .55s cubic-bezier(.55,0,.3,1)}
+#stage.tasksmode #tasksLabel{opacity:.9}
+/* THE ONE NODE layer: floats where the ring was, centred a little below the lifted orb. */
+#taskStage{position:absolute;left:0;right:0;top:30%;bottom:0;z-index:3;display:none;
+  flex-direction:column;align-items:center;pointer-events:none;opacity:0;transition:opacity .45s .1s}
+#stage.tasksmode #taskStage{display:flex;opacity:1}
+#taskStage>*{pointer-events:auto}
+/* the energy beam feeding the node from the orb above */
+#taskStage .tbeam{margin:0 0 14px}
+#taskStage #dayrunMount{width:100%;display:flex;justify-content:center}
+#taskStage #reconcileMount{width:100%;display:flex;justify-content:center;margin-bottom:6px}
+#taskStage #slipMount{margin-top:12px}
+/* the all-tasks opener, bottom-centre */
+#taskStage .tall-btn{margin-top:24px}
+/* a quiet "brief" affordance, bottom-left of the tasks stage (keeps briefing + thinking reachable) */
+#taskBrief{position:absolute;left:18px;bottom:14px;z-index:4;background:none;border:none;color:var(--dim);
+  font:inherit;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.55;
+  cursor:pointer;padding:8px 10px;display:flex;align-items:center;gap:7px;transition:opacity .18s,color .18s}
+#taskBrief:hover{opacity:1;color:#9fe3b6}
+#stage:not(.tasksmode) #taskBrief,#stage:not(.tasksmode) #tasksLabel{display:none}
+/* tasks-mode band content: streak (left) / team + reconcile (right). Reuses .tw text styling but
+   in-flow (not absolute) so it sits inside the band column. No boxes, floating text only. */
+.tband{padding:2px 2px 0;text-shadow:0 1px 6px rgba(0,0,0,.92),0 0 14px rgba(0,0,0,.5)}
+.bandR .tband{text-align:right}
+/* ===== GENERIC STAGE PAGE — any inner page on the home stage (orb lifts to top = home button,
+   matrix bg stays, simplified center, the 4 bands become corner widgets). Mirrors tasksmode. ===== */
+#stage.stagepage .node{opacity:0;pointer-events:none;transition:opacity .35s}
+#stage.stagepage #links,#stage.stagepage #neuro{opacity:0;transition:opacity .4s}
+#stage.stagepage .orb{transform:translate(-50%,-50%) scale(.6);top:15% !important}
+#stage.stagepage .orb:hover{transform:translate(-50%,-50%) scale(.64)}
+#spgLabel{position:absolute;left:50%;top:15%;transform:translate(-50%,44px);z-index:3;
+  font-size:11.5px;font-weight:800;letter-spacing:.36em;color:#9fe3b6;opacity:0;padding-left:.36em;
+  text-shadow:0 0 16px rgba(46,230,111,.35),0 1px 6px rgba(0,0,0,.9);pointer-events:none;text-transform:uppercase;
+  transition:opacity .5s .15s}
+#stage.stagepage #spgLabel{opacity:.9}
+#spgView{position:absolute;left:0;right:0;top:30%;bottom:14px;z-index:3;display:none;flex-direction:column;
+  align-items:center;overflow-y:auto;scrollbar-width:none;opacity:0;transition:opacity .45s .1s;padding:0 18px}
+#spgView::-webkit-scrollbar{display:none}
+#stage.stagepage #spgView{display:flex;opacity:1}
+#spgView>*{pointer-events:auto;width:100%;max-width:640px}
+#stage:not(.stagepage) #spgLabel,#stage:not(.stagepage) #spgView{display:none}
+.tband .tw-lbl{font-size:9px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#9fe3b6;opacity:.82}
+.tband .tw-big{font-size:30px;font-weight:200;line-height:1;color:#eafff1;margin-top:5px;text-shadow:0 0 22px rgba(46,230,111,.3),0 1px 8px rgba(0,0,0,.85)}
+.tband .tw-big small{font-size:12px;color:var(--dim);font-weight:600}
+.tband .tw-line{font-size:11px;color:var(--dim);line-height:1.5;margin-top:5px}
+.tband .tw-line b{color:#cde9d6;font-weight:700}.tband .tw-line.warn b{color:#fcd9a0}
+.tband .tw-quiet{font-size:11px;color:var(--dim);opacity:.62;margin-top:5px;line-height:1.45}
+/* reconcile rows inside the right band — stack, right-aligned, thin */
+.bandR #tmreconcileMount{margin-top:14px}
+.bandR #tmreconcileMount .recon-row{justify-content:flex-end}
+/* ===== STUDIO MODE: Jack's make-queue dressing of the SAME home stage (Eric 2026-06-12).
+   Cloned from TASKS MODE — ring hides, the real orb lifts to the top, ONE node = the #1 piece to
+   make right now, "..." reveals the next pieces, the RIGHT band pulses for every overdue/critical
+   order (impossible to ignore), the LEFT band shows momentum. No boxes/fills — floating text + fades.
+   No reparenting: the live orb is just translated up via this class, exactly like tasks mode. ===== */
+#stage.studiomode .node{opacity:0;pointer-events:none;transition:opacity .35s}
+#stage.studiomode #links,#stage.studiomode #neuro{opacity:0;transition:opacity .4s}
+#stage.studiomode .orb{transform:translate(-50%,-50%) scale(.62);top:16% !important}
+#stage.studiomode .orb:hover{transform:translate(-50%,-50%) scale(.66)}
+/* the S T U D I O wordmark under the lifted orb */
+#studioLabel{position:absolute;left:50%;top:16%;transform:translate(-50%,46px);z-index:3;
+  font-size:12px;font-weight:800;letter-spacing:.52em;color:#9fe3b6;opacity:0;padding-left:.52em;
+  text-shadow:0 0 16px rgba(46,230,111,.35),0 1px 6px rgba(0,0,0,.9);pointer-events:none;
+  transition:opacity .5s .15s,top .55s cubic-bezier(.55,0,.3,1)}
+#stage.studiomode #studioLabel{opacity:.9}
+/* THE ONE PIECE layer: floats where the ring was, centred a little below the lifted orb */
+#studioStage{position:absolute;left:0;right:0;top:30%;bottom:0;z-index:3;display:none;
+  flex-direction:column;align-items:center;pointer-events:none;opacity:0;transition:opacity .45s .1s}
+#stage.studiomode #studioStage{display:flex;opacity:1}
+#studioStage>*{pointer-events:auto}
+#studioStage .tall-btn{margin-top:24px}
+#stage:not(.studiomode) #studioLabel,#stage:not(.studiomode) #studioStage{display:none}
+/* the #1 piece — big floating display text, no box */
+.sp1{display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;max-width:600px;
+  padding:0 16px;transition:opacity .3s,transform .3s}
+.sp1.sliding{opacity:0;transform:translateY(16px)}
+.sp1-pieces{font-size:32px;font-weight:200;letter-spacing:-.01em;line-height:1.14;color:#eafff1;
+  text-shadow:0 1px 10px rgba(0,0,0,.85),0 0 30px rgba(46,230,111,.26)}
+.sp1-cust{font-size:13px;color:var(--dim);margin-top:12px;letter-spacing:.02em;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.sp1-wait{font-size:13px;font-weight:700;margin-top:7px;letter-spacing:.02em;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.sp1-wait.warn{color:#fcd9a0}.sp1-wait.crit{color:#fca5a5}.sp1-wait.ok{color:#9fe3b6}
+/* tiny monochrome class tag inline with the customer line (why this piece flags when it does) */
+.sp1-cls{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--dim);opacity:.8;letter-spacing:.04em;text-transform:uppercase}
+.sp1-cls .licon{width:.95em;height:.95em}
+/* BATCH HINT under the focus piece — line icon + text on the gradient, no box, no fill */
+.sp1-batch{display:inline-flex;align-items:center;gap:7px;margin-top:11px;font-size:12.5px;font-weight:600;
+  letter-spacing:.01em;color:#bfe9cf;opacity:.92;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.sp1-batch .licon{width:1.05em;height:1.05em;color:#9fe3b6}
+/* MORNING DIGEST — floats at the top-center of the Jack room cockpit. Text on the gradient, one
+   monochrome line icon, no box/fill. Hidden inside Production/Tasks modes (those lift the orb). */
+.studio-digest{position:absolute;left:50%;top:8.5%;transform:translate(-50%,-6px);z-index:4;
+  max-width:min(680px,82vw);text-align:center;opacity:0;pointer-events:none;
+  transition:opacity .5s ease,transform .5s ease}
+.studio-digest.show{opacity:1;transform:translate(-50%,0)}
+.studio-digest .sd-line{display:inline-flex;align-items:center;gap:9px;justify-content:center;
+  font-size:14px;font-weight:500;letter-spacing:.01em;line-height:1.4;color:#dff6e7;
+  text-shadow:0 1px 10px rgba(0,0,0,.9),0 0 22px rgba(46,230,111,.18)}
+.studio-digest .sd-line .licon{width:1.2em;height:1.2em;color:#9fe3b6;flex:none}
+#stage.studiomode .studio-digest,#stage.tasksmode .studio-digest{opacity:0!important;pointer-events:none!important}
+/* BATCH + RULES strips in the all-orders overlay — hairline separators only, no boxes/fills */
+.studio-batches,.studio-rules{padding:10px 22px;border-bottom:1px solid rgba(255,255,255,.06)}
+.studio-batches:empty{display:none}
+.sb-lbl,.sr-lbl{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--dim);opacity:.75;margin-bottom:7px}
+.sb-lbl .licon,.sr-lbl .licon{width:1.1em;height:1.1em}
+.sb-row{display:flex;align-items:center;gap:10px;background:none;border:none;color:#cfeede;font:inherit;font-size:13px;
+  font-weight:600;letter-spacing:.01em;padding:4px 0;cursor:pointer;width:100%;text-align:left;transition:color .15s}
+.sb-row:hover{color:#9fe3b6}
+.sb-age{margin-left:auto;font-size:11px;color:var(--dim);opacity:.7;font-weight:500}
+.sr-list{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
+.sr-item{font-size:12.5px;color:var(--text);opacity:.9;line-height:1.4}
+.sr-item::before{content:"· ";color:var(--dim)}
+.sr-empty{font-size:12px;color:var(--dim);opacity:.7;margin-bottom:8px}
+.sr-add{display:flex;gap:8px;align-items:center}
+.sr-input{flex:1;background:none;border:none;border-bottom:1px solid rgba(255,255,255,.14);color:var(--text);
+  font:inherit;font-size:12.5px;padding:5px 2px;outline:none}
+.sr-input:focus{border-bottom-color:rgba(46,230,111,.5)}
+.sr-btn{display:inline-flex;align-items:center;gap:5px;background:none;border:none;color:var(--dim);font:inherit;
+  font-size:12px;font-weight:700;letter-spacing:.02em;cursor:pointer;white-space:nowrap;transition:color .15s}
+.sr-btn:hover{color:#9fe3b6}
+.sr-btn .licon{width:1em;height:1em}
+.sp1-detail{font-size:11.5px;color:var(--dim);opacity:0;height:0;overflow:hidden;margin-top:0;
+  transition:opacity .25s,height .25s,margin-top .25s}
+.sp1-detail.show{opacity:.85;height:auto;margin-top:9px}
+.sp1-acts{display:flex;gap:18px;align-items:center;justify-content:center;margin-top:22px}
+.sp1-b{background:none;border:none;color:var(--dim);font:inherit;font-size:13px;font-weight:700;
+  letter-spacing:.02em;padding:7px 4px;cursor:pointer;display:flex;align-items:center;gap:7px;
+  transition:color .15s,text-shadow .15s}
+.sp1-b:hover{color:#9fe3b6;text-shadow:0 0 12px rgba(46,230,111,.4)}
+.sp1-b.on{color:#9fe3b6}
+.sp1-b .licon{width:1.05em;height:1.05em}
+/* the "..." reveal of the next pieces — floating lines, no box */
+.spMore{background:none;border:none;color:var(--dim);font:inherit;font-size:22px;font-weight:800;
+  letter-spacing:.18em;cursor:pointer;opacity:.5;margin-top:20px;padding:2px 14px;transition:opacity .18s}
+.spMore:hover{opacity:1;color:#9fe3b6}
+.spNext{display:none;flex-direction:column;align-items:center;gap:9px;margin-top:14px;max-width:560px}
+.spNext.show{display:flex}
+.spNext-row{background:none;border:none;font:inherit;cursor:pointer;text-align:center;
+  font-size:14px;color:#cde9d6;line-height:1.35;padding:3px 8px;opacity:.78;transition:opacity .15s,color .15s;
+  text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.spNext-row:hover{opacity:1;color:#eafff1}
+.spNext-row .spNext-wait{font-size:11.5px;color:var(--dim);margin-left:9px}
+.spNext-row .spNext-wait.warn{color:#fcd9a0}.spNext-row .spNext-wait.crit{color:#fca5a5}
+/* studio bands (left = momentum, right = OVERDUE pulses) reuse .tband floating text */
+.studio-empty{font-size:13px;color:var(--dim);opacity:.7;line-height:1.5;text-align:center;max-width:420px}
+/* the OVERDUE pulse rows: escalating; impossible to ignore */
+.sob-row{font-size:12px;line-height:1.4;margin-top:9px;text-align:right;
+  text-shadow:0 1px 6px rgba(0,0,0,.9)}
+.sob-row .sob-piece{font-weight:700;color:#fcd9a0}
+.sob-row .sob-meta{font-size:10.5px;color:var(--dim);margin-top:1px}
+.sob-row.over{animation:sobPulseAmber 1.9s ease-in-out infinite}
+.sob-row.crit{animation:sobPulseRed 1.15s ease-in-out infinite}
+.sob-row.crit .sob-piece{color:#fca5a5}
+@keyframes sobPulseAmber{0%,100%{opacity:.62}50%{opacity:1;text-shadow:0 0 16px rgba(252,217,160,.55),0 1px 6px rgba(0,0,0,.9)}}
+@keyframes sobPulseRed{0%,100%{opacity:.7}50%{opacity:1;text-shadow:0 0 20px rgba(252,80,80,.7),0 1px 6px rgba(0,0,0,.9)}}
+/* studio momentum stat lines (left band) */
+.som-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:9px;font-size:12px}
+.som-row .som-k{color:var(--dim);letter-spacing:.02em}
+.som-row .som-v{font-size:22px;font-weight:200;color:#eafff1;line-height:1;text-shadow:0 0 18px rgba(46,230,111,.28)}
+.som-row.fire .som-v{color:#9fe3b6}
+.som-batch-lbl{display:flex;align-items:center;gap:6px;margin-top:16px;font-size:9.5px;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--dim);opacity:.7}
+.som-batch-lbl .licon{width:1.05em;height:1.05em}
+.som-batch{display:block;width:100%;text-align:left;background:none;border:none;color:#cfeede;font:inherit;
+  font-size:12px;font-weight:600;padding:5px 0 0;cursor:pointer;line-height:1.3;transition:color .15s}
+.som-batch:hover{color:#9fe3b6}
+/* days-waiting cell colors in the studio spreadsheet (mirrors bucket) */
+.sst-wait.making{color:var(--dim)}.sst-wait.overdue{color:#fcd9a0}.sst-wait.critical{color:#fca5a5;font-weight:700}
+.sst-state{font-size:11px;color:var(--dim);background:none;border:none;font:inherit;cursor:pointer;padding:2px 7px;opacity:.7;transition:color .15s,opacity .15s}
+.sst-state:hover{opacity:1;color:#9fe3b6}
+.sst-state.on{color:#9fe3b6;opacity:1}
+/* ===== OPERATOR LOOP additions (Eric 2026-06-12): suggested-priority eyebrow, center reminders,
+   full-height right list, in-process shelf, ship-out + note/eta. All STAGE LAW: monochrome line
+   text, no boxes/fills, color only in text accents. ===== */
+/* SUGGESTED PRIORITY eyebrow above the focus piece (dim, letterspaced, monochrome) */
+.sp1-eyebrow{font-size:9.5px;font-weight:800;letter-spacing:.26em;text-transform:uppercase;color:#9fe3b6;
+  opacity:.62;margin-bottom:11px;display:inline-flex;align-items:center;gap:6px;text-shadow:0 1px 8px rgba(0,0,0,.85)}
+.sp1-eyebrow .licon{width:1em;height:1em;opacity:.85}
+/* when the focus is a NUDGE reminder (not a fresh suggestion) the eyebrow tints amber/red via these */
+.sp1-eyebrow.nudge{color:#fcd9a0;opacity:.8}
+.sp1-eyebrow.nudge.past{color:#fca5a5;opacity:.85}
+.sp1-remind{font-size:12px;color:#fcd9a0;margin-top:9px;line-height:1.45;text-shadow:0 1px 8px rgba(0,0,0,.85)}
+.sp1-remind.past{color:#fca5a5}
+.sp1-note{font-size:11.5px;color:var(--dim);opacity:.85;margin-top:7px;line-height:1.45;font-style:italic}
+/* ship-out action + its tiny clarifying note */
+.sp1-b.ship{color:#cfeede}.sp1-b.ship:hover{color:#9fe3b6}
+.sp1-shipnote{font-size:10px;color:var(--dim);opacity:.55;margin-top:9px;letter-spacing:.02em}
+.sp1-await{font-size:11px;color:#fcd9a0;opacity:.85;margin-top:8px;display:inline-flex;align-items:center;gap:6px}
+.sp1-await .licon{width:1em;height:1em}
+/* inline note + eta editor (Jack's progress answer). Borderless underline inputs, no box. */
+.sp1-edit{margin-top:16px;display:flex;flex-direction:column;gap:9px;align-items:center;width:100%;max-width:440px;margin-left:auto;margin-right:auto}
+.sp1-edit-row{display:flex;gap:10px;align-items:center;width:100%;justify-content:center;flex-wrap:wrap}
+.melinput{background:none;border:none;border-bottom:1px solid rgba(159,227,182,.28);color:#eafff1;font:inherit;
+  font-size:13px;padding:4px 2px;outline:none;transition:border-color .15s}
+.melinput::placeholder{color:var(--dim);opacity:.7}
+.melinput:focus{border-color:rgba(159,227,182,.7)}
+.melinput.note{flex:1;min-width:200px;text-align:center}
+.melinput.eta{width:150px;color:#cfeede;color-scheme:dark}
+.sp1-talk{background:none;border:none;color:var(--dim);font:inherit;font-size:11.5px;font-weight:700;
+  letter-spacing:.04em;cursor:pointer;display:inline-flex;align-items:center;gap:6px;opacity:.7;transition:color .15s,opacity .15s}
+.sp1-talk:hover{opacity:1;color:#9fe3b6}
+.sp1-talk .licon{width:1.05em;height:1.05em}
+/* RIGHT band = OVERDUE ONLY: pulsing overdue/critical pieces. Short even with 80 open orders. */
+#studioOverdue{display:flex;flex-direction:column;height:100%;min-height:0}
+#studioOverdue .sol-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;margin-top:8px;
+  padding-right:2px;scrollbar-width:thin;scrollbar-color:rgba(159,227,182,.25) transparent}
+#studioOverdue .sol-scroll::-webkit-scrollbar{width:5px}
+#studioOverdue .sol-scroll::-webkit-scrollbar-thumb{background:rgba(159,227,182,.25);border-radius:3px}
+/* a single right-list row: hairline separator, tappable, monochrome */
+.sol-row{text-align:right;padding:8px 0;cursor:pointer;border-top:1px solid rgba(159,227,182,.10);transition:opacity .15s}
+.sol-row:first-child{border-top:none}
+.sol-row:hover{opacity:1}
+.sol-row .sol-piece{font-size:12px;font-weight:700;color:#cde9d6;line-height:1.3}
+.sol-row .sol-meta{font-size:10.5px;color:var(--dim);margin-top:1px}
+.sol-row.over .sol-piece{color:#fcd9a0}
+.sol-row.over{animation:sobPulseAmber 1.9s ease-in-out infinite}
+.sol-row.crit .sol-piece{color:#fca5a5}
+.sol-row.crit{animation:sobPulseRed 1.15s ease-in-out infinite}
+.sol-row.proc .sol-piece{color:#9fe3b6}
+.sol-row .sol-tag{font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.7}
+.sol-sec{font-size:8.5px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+  opacity:.55;margin:14px 0 2px;text-align:right}
+.sol-sec:first-child{margin-top:0}
+/* IN PROCESS shelf, bottom-left of the Production stage (floating, no box) */
+/* BOTTOM-ANCHORED, GROWS UPWARD (Eric): the shelf hugs the bottom-left; as rows are added the block
+   grows toward the orb area while its bottom edge stays pinned at 16px. Content lays out bottom-origin
+   via flex (label on top of the stack, list + empty state below it but the whole stack rises). The
+   max-height keeps it clear of the orb; on expand the inner .sip-scroll scrolls instead of colliding. */
+#studioInProcess{position:absolute;left:20px;bottom:16px;z-index:4;max-width:320px;pointer-events:auto;
+  display:flex;flex-direction:column;justify-content:flex-end;max-height:calc(100vh - 220px);
+  text-shadow:0 1px 8px rgba(0,0,0,.9)}
+#stage:not(.studiomode) #studioInProcess{display:none}
+.sip-lbl{font-size:9px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#9fe3b6;opacity:.78;
+  display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.sip-lbl .licon{width:1.05em;height:1.05em}
+.sip-row{padding:6px 0;cursor:pointer;border-top:1px solid rgba(159,227,182,.09);transition:opacity .15s;opacity:.9}
+.sip-row:first-of-type{border-top:none}
+.sip-row:hover{opacity:1}
+.sip-piece{font-size:12.5px;font-weight:700;color:#cde9d6;line-height:1.3}
+.sip-piece.nudge{color:#fcd9a0}.sip-piece.past{color:#fca5a5}
+.sip-meta{font-size:10.5px;color:var(--dim);margin-top:1px;line-height:1.4}
+.sip-note{font-size:10.5px;color:var(--dim);opacity:.8;font-style:italic;margin-top:1px}
+.sip-empty{font-size:11px;color:var(--dim);opacity:.6;line-height:1.45;max-width:280px}
+/* IN PROCESS expanded scroll container -- caps height so the orb/center is never obscured */
+.sip-scroll{max-height:260px;overflow-y:auto;overflow-x:hidden;padding-right:2px;
+  scrollbar-width:thin;scrollbar-color:rgba(159,227,182,.2) transparent}
+.sip-scroll::-webkit-scrollbar{width:4px}
+.sip-scroll::-webkit-scrollbar-thumb{background:rgba(159,227,182,.2);border-radius:3px}
+/* AFTERCARE shelf, bottom-RIGHT of the Production stage (floating, no box). Mirrors In Process but
+   right-aligned. Bottom-anchored + grows upward so it stays clear of the orb (max-height + scroll). */
+#studioAftercare{position:absolute;right:20px;bottom:16px;z-index:4;max-width:320px;pointer-events:auto;
+  display:flex;flex-direction:column;justify-content:flex-end;max-height:calc(100vh - 220px);text-align:right;
+  text-shadow:0 1px 8px rgba(0,0,0,.9)}
+#stage:not(.studiomode) #studioAftercare{display:none}
+.sac-lbl{font-size:9px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#9fe3b6;opacity:.78;
+  display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-bottom:8px}
+.sac-row{padding:6px 0;cursor:default;border-top:1px solid rgba(159,227,182,.09);transition:opacity .15s;opacity:.92;
+  display:flex;align-items:flex-start;justify-content:flex-end;gap:8px}
+.sac-row:first-of-type{border-top:none}
+.sac-ico{flex:0 0 auto;margin-top:2px;order:2}
+.sac-ico .licon{width:14px;height:14px;color:#cde9d6;opacity:.85}
+.sac-body{order:1;min-width:0}
+.sac-piece{font-size:12.5px;font-weight:700;color:#cde9d6;line-height:1.3}
+.sac-meta{font-size:10.5px;color:var(--dim);margin-top:1px;line-height:1.4}
+.sac-note{font-size:10.5px;color:var(--dim);opacity:.8;font-style:italic;margin-top:1px}
+.sac-resolve{order:3;flex:0 0 auto;margin-top:1px;background:none;border:0;cursor:pointer;color:var(--dim);
+  opacity:.6;transition:opacity .15s,color .15s;padding:0}
+.sac-resolve:hover{opacity:1;color:#9fe3b6}
+.sac-resolve .licon{width:15px;height:15px}
+.sac-empty{font-size:11px;color:var(--dim);opacity:.6;line-height:1.45;max-width:280px}
+.sac-add{background:none;border:0;cursor:pointer;color:#9fe3b6;opacity:.7;font-size:11px;font-weight:700;
+  margin-top:6px;padding:0;display:inline-flex;align-items:center;gap:4px;transition:opacity .15s}
+.sac-add:hover{opacity:1}
+.sac-add .licon{width:12px;height:12px}
+.sac-form{margin-top:8px;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+.sac-form input,.sac-form select,.sac-form textarea{background:rgba(8,18,12,.7);border:1px solid rgba(159,227,182,.18);
+  color:#cde9d6;font-size:11px;padding:4px 6px;border-radius:4px;width:200px;text-align:left;font-family:inherit}
+.sac-form textarea{resize:vertical;min-height:34px}
+.sac-form-btns{display:flex;gap:6px;margin-top:2px}
+.sac-form-btns button{background:none;border:0;cursor:pointer;font-size:11px;font-weight:700;padding:2px 0}
+.sac-form-btns .save{color:#9fe3b6}
+.sac-form-btns .cancel{color:var(--dim)}
+.sac-scroll{max-height:260px;overflow-y:auto;overflow-x:hidden;padding-right:2px;
+  scrollbar-width:thin;scrollbar-color:rgba(159,227,182,.2) transparent}
+.sac-scroll::-webkit-scrollbar{width:4px}
+.sac-scroll::-webkit-scrollbar-thumb{background:rgba(159,227,182,.2);border-radius:3px}
+/* OVERDUE expanded scroll variant -- tighter height cap on the right column */
+.sol-scroll-exp{max-height:280px}
+/* INTERSTELLAR NODES (Eric 2026-06-10) — same footprint, NO border, no card: a dark slab that
+   feathers out on every side (masked ::after, same technique as the voice bar) so each node
+   dissipates into the corridor and the flare halo breathes through it. Words carry the shape. */
+.node{position:absolute;transform:translate(-50%,-50%);width:96px;padding:9px 7px;cursor:pointer;
+  z-index:2;text-align:center;border:0;background:none;
+  text-shadow:0 1px 6px rgba(0,0,0,.9),0 0 14px rgba(0,0,0,.5);
+  transition:transform .15s,filter .2s}
+.node::after{content:'';position:absolute;inset:-26px -30px;z-index:-1;pointer-events:none;
+  background:rgba(7,16,10,.74);
+  /* 50%/50% radii = the fade reaches EXACTLY the element edge and ends at 96% — fully transparent
+     before the rectangular bounds, so no box edge can ever print (the old 78% mask overshot the
+     element and got clipped square). */
+  -webkit-mask-image:radial-gradient(50% 50% at 50% 50%,#000 28%,rgba(0,0,0,.45) 58%,rgba(0,0,0,.12) 80%,transparent 96%);
+  mask-image:radial-gradient(50% 50% at 50% 50%,#000 28%,rgba(0,0,0,.45) 58%,rgba(0,0,0,.12) 80%,transparent 96%);
+  transition:background .25s}
+.node:hover{transform:translate(-50%,-50%) translateY(-3px);filter:brightness(1.3)}
+.node:hover::after{background:rgba(12,26,16,.85)}
+.node .ico{font-size:17px;line-height:1;color:#d8f4e1}
+/* minimal monochrome line icons (Eric: B&W, simple strokes, negative space) */
+.node .ico svg{width:19px;height:19px;display:block;margin:0 auto;stroke:currentColor;fill:none;
+  stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round;opacity:.92}
+.node .nm{font-size:11px;font-weight:700;margin-top:4px}
+.node .st{font-size:9.5px;color:var(--dim);margin-top:2px}
+.node .tag{display:inline-block;margin-top:5px;font-size:8.5px;font-weight:700;letter-spacing:.1em}
+.node.is-live .tag{color:#5be584;text-shadow:0 0 10px rgba(46,230,111,.55),0 1px 5px rgba(0,0,0,.9)}
+.node:not(.is-live) .tag{color:var(--dim)}
+/* Subtle screen glow, feathered fully to its edge: faint enough that you never read the
+   circle itself — you just see the nearby wall-digits lift a little, which reads as real
+   3D lighting because those digits sit on the perspective tunnel walls. 2.4s fade-out so
+   they cool slowly after a signal lands. */
+.node::before{content:'';position:absolute;left:50%;top:50%;width:380px;height:380px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(120,255,180,.5) 0%,rgba(46,230,111,.18) 30%,rgba(46,230,111,.06) 58%,rgba(46,230,111,.015) 80%,rgba(46,230,111,0) 100%);mix-blend-mode:screen;opacity:.03;pointer-events:none;z-index:-1;transition:opacity 2.4s ease-out}
+.node.flare::before{opacity:.3;transition:opacity .22s ease-out}
+.caption{position:absolute;left:50%;bottom:86px;transform:translateX(-50%);max-width:60%;text-align:center; /* sits above the bottom badge + Work/Family slider */
+  color:#bdf5cf;font-size:14px;background:rgba(6,16,10,.7);border:1px solid var(--line);
+  padding:9px 16px;border-radius:12px;backdrop-filter:blur(8px);opacity:0;transition:opacity .3s}
+.caption.show{opacity:1}
+/* Live voice bar — modern caption with an animated equalizer while Melric speaks */
+.vbar{position:fixed;left:50%;top:50px;transform:translateX(-50%);z-index:80;
+  display:flex;align-items:center;gap:13px;max-width:min(720px,90vw);padding:16px 46px;
+  border:none;box-shadow:none;border-radius:0;
+  background:radial-gradient(120% 170% at 50% 40%, rgba(6,16,10,.7) 0%, rgba(6,16,10,.4) 42%, rgba(6,16,10,0) 78%);
+  -webkit-mask-image:linear-gradient(to right, transparent 0%, #000 22%, #000 78%, transparent 100%);
+  mask-image:linear-gradient(to right, transparent 0%, #000 22%, #000 78%, transparent 100%);
+  opacity:0;pointer-events:none;transition:opacity .75s ease}
+.vbar.show{opacity:1}
+.vbar .vtag{font-size:9px;letter-spacing:.22em;font-weight:800;color:var(--muted);flex:0 0 auto}
+.vbar .eq{display:flex;align-items:center;gap:3px;height:24px;flex:0 0 auto}
+.vbar .eq i{width:3px;height:5px;border-radius:2px;background:linear-gradient(to top,#16a34a,#5eff9f);opacity:.4;transition:height .2s,opacity .2s}
+.vbar.live .eq i{animation:eqpulse .85s ease-in-out infinite}
+.vbar.live .eq i:nth-child(1){animation-delay:0s}
+.vbar.live .eq i:nth-child(2){animation-delay:.1s}
+.vbar.live .eq i:nth-child(3){animation-delay:.22s}
+.vbar.live .eq i:nth-child(4){animation-delay:.06s}
+.vbar.live .eq i:nth-child(5){animation-delay:.16s}
+.vbar.live .eq i:nth-child(6){animation-delay:.28s}
+.vbar.live .eq i:nth-child(7){animation-delay:.12s}
+@keyframes eqpulse{0%,100%{height:5px;opacity:.4}50%{height:24px;opacity:1}}
+.vbar .vtxt{font-size:14px;line-height:1.36;color:#e6fff0;text-shadow:0 1px 12px rgba(0,0,0,.85),0 0 24px rgba(0,0,0,.6);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#vbarBtn.active{background:var(--accent);color:#04150b;border-color:var(--accent)}
+/* Comments review panel */
+.cm-tier{font-size:9.5px;font-weight:800;letter-spacing:.06em;padding:2px 7px;border-radius:999px;margin-right:8px}
+.cm-reply{width:100%;margin-top:8px;background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;outline:none;box-sizing:border-box}
+.cm-reply:focus{border-color:var(--accent)}
+.cm-pend{display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+.cm-pend-txt{flex:1;color:#bdf5cf;font-size:13px}
+/* Email accounts bar */
+.em-accts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.em-acct{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px}
+.acct-x{background:none;border:none;color:var(--dim);cursor:pointer;font-size:11px;padding:0;line-height:1}
+.acct-x:hover{color:#e3705f}
+/* Calendar agenda */
+.cal-ev{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line)}
+.cal-time{min-width:74px;color:var(--cyan);font-size:12px;font-weight:600}
+.cal-ti{flex:1;font-size:14px}
+.cal-cal{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.cal-ev{flex-wrap:wrap}
+.cal-mv{display:inline-flex;gap:4px;margin-left:auto}
+.dm-btn.xs{font-size:10px;padding:3px 7px;border-radius:7px}
+/* Carousel picker + review studio */
+.biz-block{margin:6px 0 16px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,68px);gap:6px;margin:8px 0}
+.thumb{width:68px;height:68px;object-fit:cover;border-radius:8px;cursor:pointer;border:2px solid transparent;opacity:.78;background:#0e1a12}
+.thumb.sel{border-color:var(--accent);opacity:1}
+.cv-thumbs{display:flex;gap:8px;overflow-x:auto;padding:6px 0}
+.cv-slot{flex:0 0 auto;display:inline-flex;flex-direction:column;gap:4px;align-items:center}
+.cv-img{height:150px;width:auto;border-radius:8px;background:#0e1a12;display:block}
+.cm-opts{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--dim);margin:4px 0 8px}
+.cm-opts select{background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:3px 6px;font-size:12px}
+.cm-opts label{display:inline-flex;align-items:center;gap:5px}
+.cv-row{display:flex;gap:4px;justify-content:center}
+.dm-btn.xs.ins{align-self:center;opacity:.55;padding:2px 5px;white-space:nowrap}
+.dm-btn.xs.ins:hover{opacity:1}
+.cv-slot{cursor:grab;position:relative}
+.cv-slot.drop{outline:2px dashed var(--accent);outline-offset:2px;border-radius:8px}
+.cv-del{position:absolute;top:6px;right:6px;z-index:2;background:rgba(0,0,0,.55);border:none;color:#fff;border-radius:7px;font-size:13px;line-height:1;padding:5px 6px;cursor:pointer;opacity:.82}
+.cv-del:hover{opacity:1;background:rgba(227,112,95,.9)}
+.sch-thumbs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.sch-thumb{width:72px;height:90px;object-fit:cover;border-radius:8px;flex:0 0 auto;background:#0b1410;cursor:pointer;border:1px solid var(--line)}
+.sch-thumb:hover{border-color:var(--accent)}
+.plats{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.plat{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:capitalize;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:#dffbe9}
+.plat.instagram{background:rgba(225,48,108,.16);border-color:rgba(225,48,108,.5)}
+.plat.facebook{background:rgba(24,119,242,.16);border-color:rgba(24,119,242,.5)}
+.plat.tiktok{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.35)}
+.plat.pinterest{background:rgba(230,0,35,.16);border-color:rgba(230,0,35,.5)}
+.plat.youtube{background:rgba(255,0,0,.14);border-color:rgba(255,0,0,.45)}
+.plat.google{background:rgba(66,133,244,.16);border-color:rgba(66,133,244,.5)}
+.plat.unknown{opacity:.6}
+.dm-btn.xs.pos{padding:3px 7px;opacity:.7}
+.dm-btn.xs.pos.on{background:var(--accent);color:#0B0B0C;border-color:var(--accent);opacity:1}
+.hdr-del{background:rgba(0,0,0,.4);border:none;color:#fff;border-radius:7px;font-size:14px;line-height:1;padding:5px 8px;cursor:pointer;opacity:.8}
+.hdr-del:hover{opacity:1;background:rgba(227,112,95,.9)}
+.cv-img{cursor:zoom-in}
+#lightbox{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;cursor:zoom-out}
+#lightbox.show{display:flex}
+#lightbox img{max-height:94vh;max-width:94vw;border-radius:10px;box-shadow:0 24px 90px rgba(0,0,0,.7)}
+
+/* ---------- HOME COCKPIT WIDGETS (frame the orb; the 3D canvases beneath are untouched) ---------- */
+/* ---------- BORDERLESS COCKPIT (Eric 2026-06-10) ----------
+   No boxes, no outlines, nothing glassed-in. Two SYMMETRIC full-height edge bands carry
+   everything: each band is one soft gradient that melts smoothly toward the orb, and the words
+   sit straight on it. Legibility = the fade + text-shadow — never a panel.
+   LEFT band: Urgent · Our Socials · Money.  RIGHT band: Agenda · Companies & Clients · Reply. */
+.band{position:absolute;top:0;bottom:0;width:308px;z-index:4;display:flex;flex-direction:column;
+  justify-content:space-between;gap:12px;padding:22px 20px;pointer-events:none}
+.band>*{pointer-events:auto}
+.bandL{left:0;background:linear-gradient(to right,rgba(3,10,6,.74) 0%,rgba(3,10,6,.42) 46%,rgba(3,10,6,.12) 78%,rgba(3,10,6,0) 100%)}
+.bandR{right:0;background:linear-gradient(to left,rgba(3,10,6,.74) 0%,rgba(3,10,6,.42) 46%,rgba(3,10,6,.12) 78%,rgba(3,10,6,0) 100%)}
+.hw{max-height:32%;overflow-y:visible;cursor:pointer;scrollbar-width:none;position:relative;
+  text-shadow:0 1px 6px rgba(0,0,0,.92),0 0 16px rgba(0,0,0,.6);transition:opacity .18s}
+.hw::-webkit-scrollbar{display:none}
+.hw:hover{opacity:.85}
+/* GREEN VIGNETTE v3 (Eric): no per-section fog at all — ONE very subtle, perfectly smooth green
+   vignette breathing around the full outside of the frame, melting to nothing well before center. */
+#home::after{content:'';position:absolute;inset:0;z-index:3;pointer-events:none;mix-blend-mode:screen;
+  background:radial-gradient(120% 120% at 50% 50%,
+    rgba(46,230,111,0) 55%,rgba(46,230,111,.025) 74%,rgba(46,230,111,.055) 88%,rgba(46,230,111,.09) 100%)}
+.hwR,.hwR .hw-empty,.hwR .hw-note{text-align:right}
+.hwR .hw-h{flex-direction:row-reverse}
+.hw-h{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.hw-t{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#9fe3b6;opacity:.92}
+.hw-c{margin-left:auto;font-size:10px;font-weight:700;color:var(--dim)}
+.hwR .hw-c{margin-left:0;margin-right:auto}
+.hw-c.hot{color:#fca5a5}
+.hw-row{display:flex;gap:7px;align-items:baseline;padding:3.5px 0;font-size:12px;line-height:1.4}
+.hwR .hw-row{flex-direction:row-reverse}
+.hw-row .tt{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hwR .hw-row .tt{text-align:right}
+.hw-row .mut{color:var(--dim);font-size:10.5px;white-space:nowrap}
+.hw-row .ovr{color:var(--red);font-weight:700;font-size:10.5px;white-space:nowrap}
+.hw-empty{color:var(--dim);font-size:11.5px;padding:4px 0;line-height:1.45}
+.hw-note{color:var(--dim);font-size:10.5px;line-height:1.45;margin-top:6px}
+.hw-stats{display:flex;gap:20px;margin-bottom:5px}
+.hwR .hw-stats{justify-content:flex-end}
+.hw-stat .v{font-size:17px;font-weight:800}
+.hw-stat .k{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.09em;margin-top:1px}
+/* ===== OUR SOCIALS — home aesthetic: no boxes, monochrome, thin display type, type on dark ===== */
+#socials .panel{max-width:880px}
+.sox-hd{display:flex;align-items:center;gap:13px;margin-bottom:5px}
+.sox-hd .ic{color:#9fe3b6;opacity:.9;flex:0 0 auto}
+.sox-hd .ic svg{width:28px;height:28px;stroke:currentColor;fill:none;stroke-width:1.3;display:block}
+.sox-hd h2{font-size:27px;font-weight:200;letter-spacing:.015em;margin:0}
+.sox-sub{color:var(--dim);font-size:12.5px;line-height:1.5;margin-bottom:8px}
+.sox-lbl{font-size:10px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#9fe3b6;opacity:.8;margin:34px 0 14px;display:flex;align-items:center}
+.sox-lbl .c{color:var(--dim);font-weight:600;letter-spacing:.05em;margin-left:9px;text-transform:none}
+.sox-lbl .rg{margin-left:auto;background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px;opacity:.7}
+.sox-lbl .rg:hover{opacity:1;color:#9fe3b6}
+.sox-kpis{display:flex;gap:48px;flex-wrap:wrap;margin-bottom:4px}
+.sox-kpi .v{font-size:36px;font-weight:200;letter-spacing:-.015em;line-height:1;color:var(--text)}
+.sox-kpi .v.up{color:#7dffb0}
+.sox-kpi .k{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.13em;margin-top:8px}
+.sox-plat{display:flex;gap:34px;flex-wrap:wrap;margin-top:18px}
+.sox-plat .p{display:flex;flex-direction:column;gap:3px}
+.sox-plat .p .pv{font-size:16px;font-weight:300;color:var(--text)}
+.sox-plat .p .pk{font-size:10px;color:var(--dim);letter-spacing:.04em}
+.sox-plat .p .pk b{color:#9fe3b6;font-weight:600}
+.sox-acctflow{display:flex;flex-wrap:wrap;gap:7px 22px}
+.sox-acct{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text)}
+.sox-acct .pf{color:var(--dim);font-size:10px;letter-spacing:.04em;text-transform:uppercase}
+.sox-feed .r{display:flex;gap:11px;padding:9px 0;font-size:13.5px;line-height:1.5}
+.sox-feed .r .who{color:#9fe3b6;opacity:.85;white-space:nowrap;font-size:12.5px;min-width:0;flex:0 0 auto;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.sox-feed .r .tx{color:var(--text);opacity:.92;flex:1}
+.sox-pulse{color:var(--dim);font-size:13.5px;line-height:1.55;margin-bottom:16px}
+.sox-top{margin:4px 0 18px;padding-left:14px;border-left:2px solid rgba(125,255,176,.5)}
+.sox-top .l{font-size:9.5px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#7dffb0;margin-bottom:5px}
+.sox-top .w{font-size:16px;color:var(--text);line-height:1.45}
+.sox-top .y{color:var(--dim);font-size:12.5px;margin-top:4px;line-height:1.5}
+.sox-move{display:flex;gap:11px;padding:8px 0;line-height:1.5}
+.sox-move .m{flex:0 0 auto;opacity:.85}
+.sox-move .mt{flex:1;font-size:13.5px;color:var(--text)}
+.sox-move .mt .acc{color:#9fe3b6;opacity:.8;font-size:11.5px;margin-left:7px;letter-spacing:.03em}
+.sox-move .mt .mw{display:block;color:var(--dim);font-size:11.5px;margin-top:2px;line-height:1.45}
+.sox-watch{color:var(--orange);font-size:12.5px;line-height:1.55;margin-top:14px;opacity:.85}
+.sox-when{color:var(--dim);font-size:10.5px;margin-top:10px;opacity:.7}
+.sox-empty{color:var(--dim);font-size:12.5px;line-height:1.5;padding:2px 0}
+/* ===== FITNESS SPACE — gamified, fitness matrix bg, charts, anatomy reveal ===== */
+#fitness{position:relative}
+#fitMatrix{position:absolute;inset:0;z-index:0;opacity:.5;pointer-events:none}
+#fitness .panel{position:relative;z-index:1;max-width:920px}
+.fx-hd{display:flex;align-items:center;gap:13px;margin-bottom:4px}
+.fx-hd .t{font-size:26px;font-weight:200;letter-spacing:.18em}
+.fx-hd .badge{font-size:9px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#0b0b0c;background:#7dffb0;padding:3px 9px;border-radius:999px}
+.fx-goal{display:flex;align-items:center;gap:14px;margin:10px 0 20px;padding:11px 16px;border-radius:14px;background:linear-gradient(90deg,rgba(46,230,111,.12),rgba(46,230,111,0));border:1px solid rgba(46,230,111,.22)}
+.fx-goal .g{flex:1;font-size:13.5px;color:var(--text)}
+.fx-goal .g b{color:#9fe3b6}
+.fx-goal .cd{text-align:center;flex:0 0 auto}
+.fx-goal .cd .n{font-size:28px;font-weight:200;color:#7dffb0;line-height:1}
+.fx-goal .cd .k{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.12em;margin-top:3px}
+.fx-who{display:flex;gap:8px;margin-bottom:16px}
+.fx-who .w{padding:6px 18px;border-radius:999px;border:1px solid var(--line);background:rgba(10,16,12,.5);color:var(--dim);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;transition:all .18s}
+.fx-who .w.on{background:rgba(46,230,111,.16);color:#7dffb0;border-color:rgba(46,230,111,.4)}
+.fx-stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px}
+.fx-stat{flex:1;min-width:130px;background:rgba(8,14,10,.5);border:1px solid var(--line);border-radius:16px;padding:14px 16px;position:relative;overflow:hidden}
+.fx-stat .v{font-size:26px;font-weight:200;line-height:1;color:var(--text)}
+.fx-stat .v small{font-size:13px;color:var(--dim)}
+.fx-stat .v.up{color:#7dffb0}.fx-stat .v.down{color:#fca5a5}
+.fx-stat .k{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.11em;margin-top:7px}
+.fx-ring{position:absolute;right:10px;top:10px}
+.fx-sec{font-size:10px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#9fe3b6;opacity:.8;margin:26px 0 12px;display:flex;align-items:center}
+.fx-sec .rg{margin-left:auto;background:none;border:none;color:var(--dim);cursor:pointer;font-size:13px;opacity:.7}
+.fx-chartwrap{background:rgba(8,14,10,.45);border:1px solid var(--line);border-radius:16px;padding:14px 12px 8px}
+.fx-log{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.fx-log input{background:rgba(6,12,8,.7);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:7px 11px;font-size:13px;width:100px}
+.fx-work{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
+.fx-anat{flex:0 0 auto;width:230px}
+.fx-anat svg{width:230px;height:300px;display:block}
+.fx-anat .musc{fill:rgba(120,160,140,.06);stroke:#46603f;stroke-width:1.1;transition:all .5s}
+.fx-anat .musc.lit{fill:rgba(46,230,111,.34);stroke:#7dffb0;stroke-width:1.6;filter:drop-shadow(0 0 7px rgba(46,230,111,.6))}
+.fx-anat .body{fill:none;stroke:#3a4a3e;stroke-width:1.2}
+.fx-routine{flex:1;min-width:240px}
+.fx-reveal{animation:fxrise .55s ease-out}
+@keyframes fxrise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.fx-ex{display:flex;gap:11px;padding:9px 0;border-bottom:1px solid rgba(28,42,31,.4)}
+.fx-ex .nm{flex:1;font-size:14px;color:var(--text)}
+.fx-ex .why{display:block;color:var(--dim);font-size:11.5px;margin-top:2px;line-height:1.4}
+.fx-ex.add .tag{color:#7dffb0}.fx-ex.drop{opacity:.7}.fx-ex.drop .tag{color:#fca5a5}
+.fx-ex .tag{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;flex:0 0 auto;width:34px}
+/* side lists — just the names, breathing in the middle of each band */
+.sideRail{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:2px;
+  position:relative;overflow:visible;scrollbar-width:none}
+.sideRail::-webkit-scrollbar{display:none}
+.rtile.rmore{opacity:.5;font-size:14px;letter-spacing:.2em;padding-top:4px}
+.rtile.rmore:hover{opacity:.95;transform:none}
+.railLeft{align-items:flex-start}
+.railRight{align-items:flex-end;text-align:right}
+.railTitle{font-size:9px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#9fe3b6;
+  opacity:.72;padding:2px 0 7px;text-shadow:0 1px 6px rgba(0,0,0,.92)}
+.rtile{display:flex;align-items:center;gap:6px;padding:2.5px 0;
+  color:#d8f4e1;font-size:12.5px;font-weight:600;letter-spacing:.04em;cursor:pointer;white-space:nowrap;
+  opacity:.78;text-shadow:0 1px 6px rgba(0,0,0,.92),0 0 14px rgba(0,0,0,.55);
+  transition:opacity .16s,transform .16s}
+.rtile:hover{opacity:1;transform:translateX(4px)}
+.railRight .rtile:hover{transform:translateX(-4px)}
+.rtile .rnm{overflow:hidden;text-overflow:ellipsis}
+.rtile .rhub{font-size:11px;opacity:.5;padding:0 2px}
+.rtile .rhub:hover{opacity:1}
+/* Small windows: the node ring needs every pixel — the bands step aside, pure visual remains. */
+@media (max-width:1019px),(max-height:619px){.band{display:none}}
+/* GLOBAL-VIEW EDGE RAILS (Tasks stream) — same rail language as home, pinned to the screen edges so
+   the centered .panel stream stays uncluttered. Shown only on the Tasks tab (toggled in JS); hidden in
+   a room (rooms are pre-scoped). The two columns float vertically-centered like the cockpit bands. */
+.gRails{position:absolute;inset:0;pointer-events:none;z-index:4;display:none}
+#global .gRails .sideRail{position:absolute;top:50%;transform:translateY(-50%);max-height:74vh;width:190px;pointer-events:auto;padding:0 14px}
+#global .gRails .railLeft{left:0}
+#global .gRails .railRight{right:0}
+/* active project highlight on a rail tile */
+.rtile.on{opacity:1;color:#7dffb0;text-shadow:0 0 12px rgba(46,230,111,.5),0 1px 6px rgba(0,0,0,.92)}
+.rtile.rclear{opacity:.62;font-style:italic}
+@media (max-width:1099px){#global .gRails{display:none!important}}
+/* ROOM BADGE — quiet green wayfinding, centered at the top of the cockpit */
+.roomBadge{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:5;pointer-events:none;
+  font-size:11px;font-weight:800;letter-spacing:.3em;text-transform:uppercase;color:#9fe3b6;opacity:.92;
+  text-shadow:0 1px 8px rgba(0,0,0,.9),0 0 18px rgba(46,230,111,.35)}
+/* TENANT MODE (client deployment): the client lives in their room's cockpit. "← Home" stays
+   (home IS their room). What disappears: the Rooms switcher rail and the exit to Eric's cockpit —
+   the client never learns other projects exist. */
+body.tenant #projRail{display:none!important}
+body.tenant [data-exit]{display:none!important}
+/* READ-ONLY HANDOVER (Eric 2026-06-12): a non-owner tenant (Jack) sees everything but can SEND
+   nothing. Every write-action button is marked .ro-hide and disappears in read-only. Production's
+   own Start / Made (.sp1-b, .sst-state) are deliberately NOT marked, so that one interaction stays.
+   The whole compose surface (a pure send tool) is hidden too. */
+body.readonly .ro-hide{display:none!important}
+body.readonly .dm-btn.send{display:none!important}     /* approve & send / approve & reply, all views */
+body.readonly .del-b.ready{display:none!important}     /* content: stage to Ready */
+body.readonly #cmpSend{display:none!important} /* compose: the post/schedule control (the send itself) */
+/* Project chip — labels any row with the business/project it belongs to; click = drill in. */
+.pchip{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.04em;padding:1px 7px;border-radius:999px;background:rgba(46,230,111,.10);border:1px solid rgba(46,230,111,.3);color:#8fe9ae;cursor:pointer;white-space:nowrap}
+.pchip:hover{background:rgba(46,230,111,.2)}
+.pchip.dead{cursor:default;opacity:.55}
+.pchip.dead:hover{background:rgba(46,230,111,.10)}
+/* ---------- GLOBAL unified workspace ---------- */
+.brief{background:linear-gradient(180deg,rgba(22,52,31,.5),rgba(13,19,14,.5));border:1px solid #2a7a45;border-radius:14px;padding:14px 16px;margin:2px 0 14px}
+.brief-h{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.brief-t{font-size:13px;font-weight:800;letter-spacing:.04em;color:#dffbe8}
+.brief-when{font-size:10.5px;color:var(--dim)}
+.brief-rg{margin-left:auto;background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:3px 10px;font-size:13px;cursor:pointer}
+.brief-rg:hover{border-color:var(--accent);color:#dffbe8}
+.brief-rg.spin{opacity:.5;pointer-events:none}
+.brief-empty{color:var(--dim);font-size:12.5px;line-height:1.5}
+.brief-greet{color:var(--text);font-size:13.5px;line-height:1.5;margin-bottom:10px}
+.brief-sec{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#9fe3b6;font-weight:800;margin:10px 0 5px}
+.brief-pri{display:flex;gap:8px;align-items:baseline;padding:4px 0;border-bottom:1px solid rgba(28,42,31,.6);font-size:12.5px;line-height:1.4}
+.brief-pri:last-child{border-bottom:0}
+.brief-pri .n{color:#5eff9f;font-weight:800;min-width:16px}
+.brief-pri .tt{flex:1;color:var(--text)}
+.brief-pri .why{color:var(--dim);font-size:11px}
+.brief-money{background:rgba(46,230,111,.1);border:1px solid rgba(46,230,111,.35);border-radius:10px;padding:10px 12px;margin-top:8px}
+.brief-money .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:#5eff9f;font-weight:800;margin-bottom:3px}
+.brief-money .what{color:#dffbe8;font-size:13px;font-weight:700;line-height:1.4}
+.brief-money .why{color:var(--dim);font-size:11.5px;line-height:1.45;margin-top:3px}
+.brief-watch{color:#fca5a5;font-size:11.5px;line-height:1.5;margin-top:8px}
+.brief-watch div{padding:1px 0}
+/* 🧠 thinking pass - same glanceable language as the briefing card, distinct accent */
+.think{background:linear-gradient(180deg,rgba(26,30,52,.5),rgba(13,14,22,.5));border:1px solid #3a4a8a;border-radius:14px;padding:14px 16px;margin:2px 0 14px}
+.think-h{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.think-t{font-size:13px;font-weight:800;letter-spacing:.04em;color:#dfe6fb}
+.think-when{font-size:10.5px;color:var(--dim)}
+.think-rg{margin-left:auto;background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:3px 10px;font-size:13px;cursor:pointer}
+.think-rg:hover{border-color:#7f9bff;color:#dfe6fb}
+.think-rg.spin{opacity:.5;pointer-events:none}
+.think-empty{color:var(--dim);font-size:12.5px;line-height:1.5}
+.think-pulse{color:var(--text);font-size:13px;line-height:1.5;margin-bottom:10px}
+.think-row{display:flex;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid rgba(40,46,80,.6)}
+.think-row:last-child{border-bottom:0}
+.think-row.gone{opacity:0;transition:opacity .35s}
+.think-u{min-width:14px;font-size:12px}
+.think-mid{flex:1;min-width:0}
+.think-title{color:var(--text);font-size:12.5px;line-height:1.4;font-weight:600}
+.think-money{color:#9fe3b6;font-size:11px;margin-top:2px}
+.think-why{color:var(--dim);font-size:11px;line-height:1.4;margin-top:1px}
+.think-btns{display:flex;gap:5px;align-items:center}
+.think-add,.think-x{background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:7px;padding:3px 8px;font-size:11px;cursor:pointer;white-space:nowrap}
+.think-add:hover{border-color:#5eff9f;color:#dffbe8}
+.think-x:hover{border-color:#fca5a5;color:#fca5a5}
+.think-tick{color:#5eff9f;font-size:12px;font-weight:800}
+.think-watch{color:#fca5a5;font-size:11.5px;line-height:1.5;margin-top:8px}
+.think-watch div{padding:1px 0}
+.gtabs{display:flex;gap:8px;margin:2px 0 12px}
+.gtab{background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:10px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer}
+.gtab:hover{border-color:var(--accent)}
+.gtab.on{background:#16341f;border-color:#2a7a45;color:#dffbe8}
+.projbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.projchip{background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:999px;padding:4px 11px;font-size:11.5px;font-weight:600;cursor:pointer}
+.projchip:hover{border-color:var(--accent)}
+.projchip.on{background:#16341f;border-color:#2a7a45;color:#dffbe8}
+/* Content Runway strip — days of queued content per business; RED when low (<3 days). */
+.rwstrip{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 8px}
+.rwcard{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:8px 12px;min-width:118px}
+.rwcard .rb{font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.rwcard .rd{font-size:17px;font-weight:800;margin-top:2px;color:#5be584}
+.rwcard .rk{font-size:9.5px;color:var(--dim);margin-top:2px}
+.rwcard.low{border-color:rgba(248,113,113,.55);background:rgba(248,113,113,.07)}
+.rwcard.low .rd{color:#fca5a5}
+.rwwarn{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.45);border-radius:11px;padding:9px 13px;font-size:12.5px;line-height:1.5;color:#fecaca;margin:0 0 10px}
+.hw-row.rwhot{color:#fca5a5;font-size:11px;line-height:1.4;white-space:normal}
+.hw-row.rwhot .tt{color:#fca5a5;white-space:normal}
+/* Growth idea cards */
+.idea{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:13px 15px;margin-bottom:11px}
+.idea .it{font-size:14.5px;font-weight:800;color:#dffbe8}
+.idea .iw{font-size:13px;color:var(--text);line-height:1.5;margin-top:6px}
+.idea .if{font-size:12.5px;line-height:1.5;margin-top:7px;color:#9fe3b6}
+.idea .if b{color:#5effa0}
+
+/* ====== THE DAY RUN - big move cards, no boxes, gradient + fades (Eric's cockpit) ====== */
+/* ====== THE SPOTLIGHT STAGE - current move as signage, queue beneath, no boxes/borders ====== */
+.stage{margin:4px 0 26px}
+.stage-empty{color:var(--dim);font-size:13px;line-height:1.55;padding:14px 0}
+/* SPOTLIGHT — the current move, rendered like home-cockpit signage straight on the gradient. */
+.spot{position:relative;padding:30px 6px 18px;margin:0 0 10px;
+  background:linear-gradient(to bottom,rgba(46,230,111,.075) 0%,rgba(46,230,111,.02) 48%,rgba(46,230,111,0) 100%);
+  transition:opacity .3s,transform .3s}
+.spot.gone{opacity:0;transform:translateX(16px)}
+.spot.sliding{opacity:0;transform:translateY(18px)}
+.spot.cleared{opacity:.4}
+.spot.cleared .spot-title{text-decoration:line-through;color:var(--dim)}
+.spot-chip{margin-bottom:11px}
+.spot-title{font-size:38px;font-weight:200;letter-spacing:-.01em;line-height:1.1;color:#eafff1;
+  text-shadow:0 1px 10px rgba(0,0,0,.85),0 0 26px rgba(46,230,111,.22)}
+.spot-sub{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap;margin-top:13px}
+.spot-money{font-size:13px;font-weight:700;color:#9fe3b6;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.spot-why{font-size:13px;color:var(--dim);line-height:1.5;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.spot-acts{display:flex;gap:9px;align-items:center;margin-top:22px;flex-wrap:wrap}
+.spot-b{background:none;border:none;color:var(--dim);font:inherit;font-size:13.5px;font-weight:700;padding:8px 19px;border-radius:999px;cursor:pointer;transition:all .15s}
+.spot-b.done{color:#5effa0;background:radial-gradient(ellipse at center,rgba(46,230,111,.18),rgba(46,230,111,0) 76%)}
+.spot-b.done:hover{background:radial-gradient(ellipse at center,rgba(46,230,111,.3),rgba(46,230,111,0) 80%)}
+.spot-b.del{color:#cdd9ff;background:radial-gradient(ellipse at center,rgba(127,155,255,.16),rgba(127,155,255,0) 76%)}
+.spot-b.del:hover{background:radial-gradient(ellipse at center,rgba(127,155,255,.28),rgba(127,155,255,0) 80%)}
+.spot-b.later{color:var(--dim)}.spot-b.later:hover{color:var(--text)}
+.spot-x{background:none;border:none;color:var(--dim);font:inherit;font-size:13px;opacity:.4;padding:8px 10px;cursor:pointer;margin-left:2px;transition:opacity .15s}
+.spot-x:hover{opacity:.85}
+/* THE QUEUE — remaining moves as readable, clickable one-line rows. */
+.queue{margin-top:2px}
+.q-row{display:flex;align-items:center;gap:12px;padding:11px 4px;cursor:pointer;
+  color:#d8f4e1;transition:opacity .25s,transform .15s,background .15s;border-radius:10px}
+.q-row:hover{background:linear-gradient(to right,rgba(46,230,111,.06),rgba(46,230,111,0) 70%);transform:translateX(3px)}
+.q-row.gone{opacity:0;transform:translateX(14px)}
+.q-row.cleared{opacity:.4}
+.q-title{flex:1;min-width:0;font-size:15px;font-weight:600;letter-spacing:.01em;color:#d8f4e1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 6px rgba(0,0,0,.8)}
+.q-chip{flex:0 0 auto}
+.q-money{flex:0 0 auto;font-size:11px;font-weight:700;color:#9fe3b6;opacity:.85;white-space:nowrap}
+.q-acts{flex:0 0 auto;display:flex;gap:4px;opacity:0;transition:opacity .15s}
+.q-row:hover .q-acts{opacity:1}
+.q-b{background:none;border:none;color:var(--dim);font:inherit;font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;cursor:pointer}
+.q-b.done{color:#5effa0}.q-b.done:hover{background:rgba(46,230,111,.16)}
+.q-b.x{opacity:.55}.q-b.x:hover{opacity:1;color:var(--text)}
+/* DAY WON - the existing won moment, now centered on the stage. */
+.stage-won{text-align:center;padding:34px 0 10px}
+.stage-won .sw-trophy{font-size:46px;line-height:1;filter:drop-shadow(0 0 22px rgba(46,230,111,.5))}
+.stage-won .sw-t{font-size:30px;font-weight:200;letter-spacing:.14em;color:#5be584;margin-top:12px;text-shadow:0 0 24px rgba(46,230,111,.5)}
+.stage-won .sw-sub{font-size:13px;color:var(--dim);margin-top:9px}
+/* delegate drawer (shared by Day Run / fires / vault) */
+.del-draw{margin-top:11px;padding-top:10px;background:linear-gradient(to bottom,rgba(127,155,255,.05),rgba(127,155,255,0) 70%);border-radius:10px}
+.del-lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:#aab9ff;font-weight:800;margin:0 0 7px 2px}
+.del-row{display:flex;gap:9px;align-items:center;padding:6px 4px;border-radius:9px}
+.del-row:hover{background:rgba(127,155,255,.06)}
+.del-nm{flex:1;min-width:0;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.del-mut{font-size:10px;color:var(--dim);white-space:nowrap}
+.del-b{background:none;border:none;color:var(--dim);font:inherit;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.del-b.ready{color:#5effa0;background:rgba(46,230,111,.1)}
+.del-b.ready:hover{background:rgba(46,230,111,.2)}
+.del-b.cap{color:#cdd9ff;background:rgba(127,155,255,.1)}
+.del-b.cap:hover{background:rgba(127,155,255,.2)}
+.del-b.studio{color:var(--dim)}.del-b.studio:hover{color:var(--text)}
+.del-cap{margin:7px 2px 2px;padding:9px 11px;border-radius:9px;background:rgba(127,155,255,.06);font-size:12px;line-height:1.5;color:var(--text);white-space:pre-wrap}
+.del-cap .cp{display:block;margin-top:7px}
+.del-note{font-size:11px;color:var(--dim);line-height:1.45;padding:4px 2px}
+.del-files:not(:empty){margin-top:6px}
+/* ====== AMBIENT BAND - rings constellation (left), fire embers (center), done count (right) ====== */
+.ambient{display:flex;align-items:flex-start;gap:34px;flex-wrap:wrap;margin:6px 0 14px;
+  padding-top:16px;background:linear-gradient(to bottom,rgba(46,230,111,.025),rgba(46,230,111,0) 60%)}
+.ambient .amb-col{min-width:0}
+.ambient .amb-rings{flex:1 1 auto}
+.ambient .amb-fires{flex:0 1 auto;display:flex;justify-content:center}
+.ambient .amb-shelf{flex:0 0 auto;margin-left:auto}
+/* inside the strip the inner components shed their own block margins + sit inline */
+.ambient .rings,.ambient .fires,.ambient .shelf{margin:0}
+.ambient .fires .fire-strip{flex-direction:column;gap:6px;align-items:flex-start}
+.ambient .fire-chip{animation:ember 2.6s ease-in-out infinite}
+@keyframes ember{0%,100%{opacity:.78;box-shadow:0 0 0 rgba(248,113,113,0)}50%{opacity:1;box-shadow:0 0 14px rgba(248,113,113,.22)}}
+.ambient .shelf{flex-direction:column;align-items:flex-end;text-align:right;gap:3px}
+.ambient .shelf-list{display:none}
+/* ====== PROJECT RINGS - small SVG progress rings per project ====== */
+.rings{display:flex;gap:14px;flex-wrap:wrap;margin:2px 0 18px;align-items:flex-start}
+.ring{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;background:none;border:none;font:inherit;padding:2px}
+.ring svg{display:block}
+.ring .rg-track{stroke:rgba(127,150,134,.18);fill:none}
+.ring .rg-arc{fill:none;stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoffset .5s}
+.ring .rg-arc.hot{stroke:#fca5a5}
+.ring .rg-n{font-size:14px;font-weight:800;fill:var(--text)}
+.ring .rg-lbl{font-size:10px;color:var(--dim);max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.ring.on .rg-lbl{color:#dffbe8}
+.ring:hover .rg-lbl{color:var(--text)}
+/* ====== FIRES ROW - overdue flame chips ====== */
+.fires{margin:2px 0 18px}
+.fire-strip{display:flex;gap:7px;flex-wrap:wrap}
+.fire-chip{display:inline-flex;align-items:center;gap:6px;background:radial-gradient(ellipse at center,rgba(248,113,113,.13),rgba(248,113,113,0) 80%);color:#fecaca;font-size:11.5px;font-weight:700;padding:6px 13px;border-radius:999px;cursor:pointer;transition:opacity .4s,transform .4s}
+.fire-chip:hover{background:radial-gradient(ellipse at center,rgba(248,113,113,.22),rgba(248,113,113,0) 82%)}
+.fire-chip.burned{opacity:0;transform:scale(.85)}
+.fire-chip .fd{font-size:10px;color:#fca5a5;opacity:.85}
+.fire-row{padding:9px 12px;margin:8px 0;border-radius:12px;background:radial-gradient(ellipse at left,rgba(248,113,113,.08),rgba(248,113,113,0) 80%)}
+.fire-row.burned{opacity:0;transition:opacity .4s}
+.fire-rt{font-size:13.5px;font-weight:700;color:#fecaca}
+.fire-rm{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.fire-b{background:none;border:none;color:var(--dim);font:inherit;font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer}
+.fire-b.done{color:#5effa0;background:rgba(46,230,111,.1)}.fire-b.done:hover{background:rgba(46,230,111,.2)}
+.fire-b.del{color:#cdd9ff;background:rgba(127,155,255,.1)}.fire-b.del:hover{background:rgba(127,155,255,.2)}
+.fires-quiet{color:var(--dim);font-size:12px;opacity:.7}
+/* ====== DONE SHELF ====== */
+.shelf{display:flex;gap:10px;align-items:center;margin:2px 0 16px;flex-wrap:wrap}
+.shelf-n{font-size:22px;font-weight:800;color:#5be584;line-height:1}
+.shelf-lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim);font-weight:800}
+.shelf-list{display:flex;gap:7px;flex-wrap:wrap;flex:1;min-width:0}
+.shelf-pill{font-size:10.5px;color:var(--dim);padding:3px 11px;border-radius:999px;background:rgba(46,230,111,.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.shelf-empty{font-size:11.5px;color:var(--dim);opacity:.7}
+/* ====== THE VAULT - tiny "≡ N tasks" affordance at the very bottom; opens the full list ====== */
+.vault-tog{display:inline-flex;align-items:center;gap:7px;cursor:pointer;padding:7px 2px;margin-top:6px;color:var(--dim);font-size:11px;font-weight:600;letter-spacing:.04em;opacity:.7;user-select:none;transition:opacity .15s}
+.vault-tog:hover{color:var(--text);opacity:1}
+.vault-tog .car{font-size:13px;opacity:.85}
+.vault-tog.open{opacity:1;color:var(--text)}
+.vault-body{margin-top:6px}
+/* 🗓 schedule pass: a tiny reflow control + one-line "moved N" note that sits on the vault toggle line */
+.sched-line{display:inline-flex;align-items:center;gap:9px;margin-left:12px;vertical-align:middle}
+.sched-reflow{background:none;border:none;color:var(--dim);font:inherit;font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;cursor:pointer;opacity:.7;transition:opacity .15s,color .15s}
+.sched-reflow:hover{color:#cdd9ff;background:rgba(127,155,255,.12);opacity:1}
+.sched-reflow.spin{animation:schedspin .8s linear infinite;display:inline-block;opacity:.6;pointer-events:none}
+@keyframes schedspin{to{transform:rotate(360deg)}}
+.sched-note{font-size:10.5px;color:var(--dim);opacity:.6}
+/* slip-flag chips - distinct from overdue flames (amber warn, not red fire) */
+.slip-strip{display:flex;flex-direction:column;gap:6px;margin:4px 0 14px}
+.slip-chip{display:inline-flex;align-items:center;gap:8px;background:radial-gradient(ellipse at left,rgba(245,180,80,.12),rgba(245,180,80,0) 80%);color:#fcd9a0;font-size:11.5px;font-weight:700;padding:6px 13px;border-radius:999px;text-align:left}
+.slip-chip .slip-n{font-size:10px;color:#f5b450;opacity:.9}
+/* RECONCILER - thin "looks done" confirmation rows above the spotlight (a send closed the loop). */
+.recon-strip{display:flex;flex-direction:column;gap:6px;margin:2px 0 12px}
+.recon-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:radial-gradient(ellipse at left,rgba(120,210,160,.13),rgba(120,210,160,0) 82%);padding:7px 13px;border-radius:999px;transition:opacity .3s ease,transform .3s ease}
+.recon-row.gone{opacity:0;transform:translateX(10px);pointer-events:none}
+.recon-tag{font-size:11.5px;font-weight:800;color:#a7e8c4;flex-shrink:0}
+.recon-title{font-size:12px;font-weight:700;color:#e7f5ec}
+.recon-ev{font-size:10.5px;color:#7fae93;opacity:.92}
+.recon-acts{display:inline-flex;gap:6px;margin-left:auto;flex-shrink:0}
+.recon-b{background:none;border:1px solid rgba(160,220,185,.32);color:#bfeccf;font:inherit;font-size:11px;font-weight:700;padding:4px 11px;border-radius:999px;cursor:pointer}
+.recon-b.done:hover{background:rgba(120,210,160,.18)}
+.recon-b.no{color:var(--dim);border-color:rgba(255,255,255,.16)}
+.recon-b.no:hover{background:rgba(255,255,255,.06)}
+.task .t-x{background:none;border:none;color:var(--dim);font:inherit;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;cursor:pointer;margin-left:auto;flex-shrink:0;align-self:center}
+.task .t-x:hover{color:#cdd9ff;background:rgba(127,155,255,.12)}
+
+/* ============================================================================
+   THE TASKS STREAM - Eric's floating, gamified rebuild (2026-06-12).
+   No boxes, no fills, no solid panels. Floating text on the matrix corridor,
+   text-shadow for legibility, soft fades. A mini Melric orb powers the #1 move
+   via an energy beam; the three top moves float as display text; "..." pops four
+   more; corner widgets (streak / team) hover at the edges; "all tasks" opens the
+   spreadsheet overlay (which absorbs the old vault).
+   ============================================================================ */
+.tstream{position:relative;display:flex;flex-direction:column;align-items:center;
+  padding:6px 0 30px;min-height:60vh}
+/* corner widgets - floating text blocks pinned to the stream corners, no boxes */
+.tw{position:absolute;top:2px;max-width:210px;z-index:3;opacity:.92;
+  text-shadow:0 1px 6px rgba(0,0,0,.92),0 0 14px rgba(0,0,0,.5)}
+.tw-left{left:0;text-align:left}
+.tw-right{right:0;text-align:right}
+.tw-lbl{font-size:9px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#9fe3b6;opacity:.82}
+.tw-big{font-size:30px;font-weight:200;line-height:1;color:#eafff1;margin-top:5px;
+  text-shadow:0 0 22px rgba(46,230,111,.3),0 1px 8px rgba(0,0,0,.85)}
+.tw-big small{font-size:12px;color:var(--dim);font-weight:600;letter-spacing:.04em}
+.tw-line{font-size:11px;color:var(--dim);line-height:1.5;margin-top:5px}
+.tw-line b{color:#cde9d6;font-weight:700}
+.tw-line.warn b{color:#fcd9a0}
+.tw-quiet{font-size:11px;color:var(--dim);opacity:.62;margin-top:5px;line-height:1.45}
+/* HEADER - mini orb + letterspaced TASKS title */
+.thead{display:flex;flex-direction:column;align-items:center;margin:4px 0 0}
+/* ORB HOST — the REAL home atom canvas (#orbCanvas) is REPARENTED here while Tasks is open, then
+   restored to .orb#orb on exit (DOM move only — orb3d.js is untouched). The home canvas rule sizes
+   itself to 300% of this host and centers via transform, so the nucleus reads ~110px here. */
+.tOrbHost{width:110px;height:110px;position:relative;overflow:visible;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:filter .18s}
+.tOrbHost:hover{filter:brightness(1.14)}
+/* the reparented #orbCanvas keeps the same 300%-overflow / centered transform it has on home, so the
+   atom's orbits + glow read past the 110px nucleus box here too. */
+.tOrbHost #orbCanvas{position:absolute;left:50%;top:50%;width:300%;height:300%;transform:translate(-50%,-50%);pointer-events:none;z-index:2;background:transparent}
+/* MONOCHROME LINE ICONS — inherit text color via currentColor; no fills. */
+.licon{width:1em;height:1em;display:inline-block;vertical-align:-0.14em;flex:0 0 auto}
+.tw-big .licon{width:.82em;height:.82em;vertical-align:-0.04em;margin-right:.06em}
+.thead-t{font-size:12px;font-weight:800;letter-spacing:.52em;color:#9fe3b6;opacity:.9;
+  margin-top:2px;padding-left:.52em;text-shadow:0 0 16px rgba(46,230,111,.35),0 1px 6px rgba(0,0,0,.9)}
+/* ENERGY BEAM — a faint pulsing line from the orb down into the #1 move */
+.tbeam{width:2px;height:34px;margin:6px 0 2px;border-radius:2px;
+  background:linear-gradient(to bottom,rgba(94,255,160,.55),rgba(46,230,111,.18) 60%,rgba(46,230,111,0));
+  animation:tbeamPulse 2.4s ease-in-out infinite}
+@keyframes tbeamPulse{0%,100%{opacity:.45;box-shadow:0 0 6px rgba(94,255,160,.25)}50%{opacity:1;box-shadow:0 0 16px rgba(94,255,160,.55)}}
+/* THE THREE - top move as big floating display text, next two dimmer beneath */
+.tthree{display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;max-width:560px}
+.t1{position:relative;padding:2px 4px 4px;transition:opacity .3s,transform .3s}
+.t1.gone{opacity:0;transform:translateY(14px)}
+.t1.sliding{opacity:0;transform:translateY(16px)}
+.t1.cleared{opacity:.4}.t1.cleared .t1-title{text-decoration:line-through;color:var(--dim)}
+.t1-chip{margin-bottom:9px}
+.t1-title{font-size:34px;font-weight:200;letter-spacing:-.01em;line-height:1.12;color:#eafff1;
+  text-shadow:0 1px 10px rgba(0,0,0,.85),0 0 30px rgba(46,230,111,.26)}
+.t1-sub{display:flex;gap:14px;align-items:baseline;justify-content:center;flex-wrap:wrap;margin-top:11px}
+.t1-money{font-size:12.5px;font-weight:700;color:#9fe3b6;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.t1-why{font-size:12.5px;color:var(--dim);line-height:1.5;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.t1-acts{display:flex;gap:14px;align-items:center;justify-content:center;margin-top:20px}
+.t1-b{background:none;border:none;color:var(--dim);font:inherit;font-size:13px;font-weight:700;
+  letter-spacing:.02em;padding:7px 4px;cursor:pointer;transition:color .15s,text-shadow .15s}
+.t1-b.done{color:#5effa0}.t1-b.done:hover{text-shadow:0 0 16px rgba(46,230,111,.6)}
+.t1-b.del{color:#cdd9ff}.t1-b.del:hover{text-shadow:0 0 16px rgba(127,155,255,.55)}
+.t1-b.later:hover{color:var(--text)}
+.t1-x{background:none;border:none;color:var(--dim);font:inherit;font-size:13px;opacity:.4;padding:7px 4px;cursor:pointer;transition:opacity .15s}
+.t1-x:hover{opacity:.85}
+/* the next two (and the four under "...") - smaller, dimmer floating lines, click promotes */
+.tnext{margin-top:22px;display:flex;flex-direction:column;align-items:center;gap:13px;width:100%}
+.tline{display:flex;align-items:center;gap:11px;justify-content:center;cursor:pointer;max-width:520px;
+  transition:opacity .25s,transform .15s,text-shadow .15s}
+.tline:hover{transform:translateY(-1px)}
+.tline.gone{opacity:0;transform:translateY(10px)}
+.tline.cleared{opacity:.4}
+.tline-title{font-size:18px;font-weight:300;letter-spacing:.005em;color:#bfe0cb;opacity:.78;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 7px rgba(0,0,0,.8)}
+.tline:hover .tline-title{opacity:1;color:#d8f4e1;text-shadow:0 0 14px rgba(46,230,111,.3),0 1px 7px rgba(0,0,0,.8)}
+.tline.dim .tline-title{font-size:16px;opacity:.6}
+.tline-chip{flex:0 0 auto;opacity:.85}
+.tline-money{flex:0 0 auto;font-size:11px;font-weight:700;color:#9fe3b6;opacity:.8;white-space:nowrap}
+.tline-acts{flex:0 0 auto;display:flex;gap:5px;opacity:0;transition:opacity .15s}
+.tline:hover .tline-acts{opacity:.85}
+.tline-b{background:none;border:none;color:var(--dim);font:inherit;font-size:12px;font-weight:700;padding:3px 6px;cursor:pointer}
+.tline-b.done{color:#5effa0}.tline-b.x:hover{color:var(--text)}
+.tmore-pop{display:flex;flex-direction:column;align-items:center;gap:13px;width:100%;margin-top:13px;
+  animation:tmoreFade .4s ease both}
+@keyframes tmoreFade{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+/* THE DOTS — minimal "..." reveal button */
+.tdots{background:none;border:none;color:var(--dim);font:inherit;font-size:22px;letter-spacing:.18em;
+  line-height:1;padding:14px 18px 6px;cursor:pointer;opacity:.55;transition:opacity .18s,color .18s}
+.tdots:hover{opacity:1;color:#9fe3b6}
+.tdots.open{color:#9fe3b6;opacity:1}
+/* status line under the dots — folds slip-flags + schedule note into one quiet floating line */
+.tstatus{font-size:11px;color:var(--dim);opacity:.66;line-height:1.5;text-align:center;margin-top:10px;max-width:520px}
+.tstatus .warn{color:#fcd9a0}
+.tstatus .sep{opacity:.4;margin:0 7px}
+.tstatus .relink{background:none;border:none;color:var(--dim);font:inherit;font-size:11px;font-weight:700;cursor:pointer;opacity:.8}
+.tstatus .relink:hover{color:#cdd9ff}
+/* the won moment, centered on the stream */
+.tstream-won{text-align:center;padding:30px 0 6px}
+.tstream-won .swt{font-size:46px;line-height:1;filter:drop-shadow(0 0 22px rgba(46,230,111,.5))}
+.tstream-won .sw1{font-size:30px;font-weight:200;letter-spacing:.14em;color:#5be584;margin-top:12px;text-shadow:0 0 24px rgba(46,230,111,.5)}
+.tstream-won .sw2{font-size:13px;color:var(--dim);margin-top:9px}
+.tstream-empty{color:var(--dim);font-size:13px;line-height:1.6;text-align:center;padding:24px 0;max-width:460px}
+/* the floating recon "looks done" line — thin, above the three */
+.tstream .recon-strip{align-items:center;max-width:560px;width:100%}
+/* "all tasks" text button - bottom-center, minimal */
+.tall-btn{background:none;border:none;color:var(--dim);font:inherit;font-size:11px;font-weight:800;
+  letter-spacing:.16em;text-transform:uppercase;cursor:pointer;opacity:.6;margin-top:30px;
+  padding:8px 14px;transition:opacity .18s,color .18s}
+.tall-btn:hover{opacity:1;color:#9fe3b6}
+/* ALL TASKS OVERLAY - clean spreadsheet, hairline row separators only, no fills/borders/zebra */
+.tall-ov{position:absolute;inset:0;z-index:40;display:none;flex-direction:column;
+  background:rgba(6,11,8,.93);backdrop-filter:blur(14px)}
+.tall-ov.show{display:flex}
+.tall-head{display:flex;align-items:center;gap:14px;padding:18px 26px 10px;flex-wrap:wrap}
+.tall-title{font-size:13px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#9fe3b6}
+.tall-x{margin-left:auto;background:none;border:none;color:var(--dim);font:inherit;font-size:18px;cursor:pointer;padding:4px 8px}
+.tall-x:hover{color:var(--text)}
+.tall-reflow{background:none;border:none;color:var(--dim);font:inherit;font-size:11px;font-weight:700;padding:4px 9px;cursor:pointer;opacity:.75}
+.tall-reflow:hover{color:#cdd9ff}
+.tall-reflow.spin{animation:schedspin .8s linear infinite;display:inline-block;opacity:.6;pointer-events:none}
+.tall-note{font-size:10.5px;color:var(--dim);opacity:.7}
+.tall-filters{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:2px 26px 12px}
+.tall-fl{font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);opacity:.6;margin-right:2px}
+.tchip{background:none;border:none;font:inherit;font-size:11px;font-weight:700;letter-spacing:.02em;
+  color:var(--dim);padding:3px 11px;border-radius:999px;cursor:pointer;opacity:.7;transition:all .15s}
+.tchip:hover{opacity:1;color:#cde9d6}
+.tchip.on{color:#04150b;background:var(--accent);opacity:1}
+.tall-scroll{flex:1;overflow-y:auto;padding:0 26px 26px}
+.ttable{width:100%;border-collapse:collapse;font-size:13px}
+.ttable th{text-align:left;font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--dim);padding:8px 12px 8px 0;cursor:pointer;white-space:nowrap;user-select:none;
+  border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(6,11,8,.96)}
+.ttable th:hover{color:#9fe3b6}
+.ttable th .ar{opacity:.55;font-size:9px;margin-left:3px}
+.ttable td{padding:11px 12px 11px 0;border-bottom:1px solid rgba(28,42,31,.6);vertical-align:middle;color:var(--text)}
+.ttable tr:hover td{background:linear-gradient(to right,rgba(46,230,111,.04),rgba(46,230,111,0) 80%)}
+.ttable tr.done-row td{opacity:.4;text-decoration:line-through}
+.tt-task{color:#e6f5ec;line-height:1.4}
+.tt-chk{width:15px;height:15px;border-radius:5px;border:1.5px solid var(--line);cursor:pointer;display:inline-block;flex:0 0 auto;transition:all .15s;vertical-align:middle;margin-right:10px}
+.tt-chk:hover{border-color:var(--accent);box-shadow:0 0 10px rgba(46,230,111,.4)}
+.tt-due.over{color:#fca5a5}
+.tt-owner{color:var(--dim);font-size:12px}
+.tall-empty{color:var(--dim);font-size:13px;padding:30px 0;text-align:center}
+.badge.po,.badge.p0{color:#fca5a5}.badge.p1{color:#fcd34d}.badge.p2{color:#9fe3b6}.badge.p3{color:var(--dim)}
+@media (max-width:560px){
+  .tw{position:static;max-width:none;text-align:center;margin:0 auto}
+  .tw-left,.tw-right{text-align:center}
+  .t1-title{font-size:26px}
+}
+
+/* ---------- TASKS / AGENT VIEWS ---------- */
+.panel{position:absolute;inset:0;overflow-y:auto;padding:22px 26px}
+.back{background:#0e1a12;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;margin-bottom:14px}
+.back:hover{background:#16301f}
+.counts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.pill{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--text)}
+.pill.hot{color:#fca5a5;border-color:rgba(248,113,113,.4)} .pill.warn{color:#fcd34d;border-color:rgba(251,191,36,.4)}
+.sec{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);font-weight:700;margin:18px 0 10px}
+/* ---- Outreach Workstation v2 — cockpit language: borderless, fades, icons, game-feel ---- */
+.ow-tabs{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.ow-tab{background:none;border:none;color:var(--dim);font:inherit;font-size:13px;font-weight:700;padding:7px 15px;border-radius:999px;cursor:pointer}
+.ow-tab.on{color:var(--text);background:radial-gradient(ellipse at center,rgba(46,230,111,.14),rgba(46,230,111,0) 78%)}
+.ow-stats{display:flex;gap:30px;margin:10px 0 4px;flex-wrap:wrap}
+.ow-stat{text-align:center;min-width:54px}
+.ow-stat .v{font-size:23px;font-weight:800;line-height:1.1}
+.ow-stat .k{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin-top:3px}
+.ow-stat.fire .v{color:var(--accent);text-shadow:0 0 14px rgba(46,230,111,.45)}
+.ow-now{display:flex;gap:9px;align-items:center;padding:6px 8px;border-radius:10px;font-size:12.5px;cursor:pointer;background:linear-gradient(to right,rgba(46,230,111,.07),rgba(46,230,111,0) 75%)}
+.ow-now:hover{background:linear-gradient(to right,rgba(46,230,111,.12),rgba(46,230,111,0) 80%)}
+.ow-now .tt{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ow-now .mut{color:var(--dim);font-size:10.5px;white-space:nowrap}
+.ow-card{position:relative;padding:13px 15px;margin:9px 0;border-radius:14px;background:linear-gradient(to right,rgba(46,230,111,.055),rgba(46,230,111,0) 82%)}
+.ow-name{font-size:16px;font-weight:800;letter-spacing:.01em}
+.ow-bar{height:3px;border-radius:2px;background:rgba(127,150,134,.16);margin:9px 0 7px;overflow:hidden}
+.ow-bar i{display:block;height:100%;border-radius:2px;background:linear-gradient(to right,#15803d,var(--accent));box-shadow:0 0 9px rgba(46,230,111,.5)}
+.ow-bar.drv i{opacity:.45;box-shadow:none}
+.ow-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ow-chip{font-size:10.5px;color:var(--dim);padding:2.5px 10px;border-radius:999px;background:rgba(127,150,134,.10);white-space:nowrap}
+.ow-ic{background:none;border:none;color:var(--dim);cursor:pointer;font-size:13px;padding:4px 8px;border-radius:8px;font-family:inherit}
+.ow-ic:hover{color:var(--text);background:rgba(46,230,111,.09)}
+.ow-strip{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0 10px}
+.ow-stage{display:flex;flex-direction:column;align-items:center;gap:1px;background:none;border:none;cursor:pointer;color:var(--dim);padding:8px 14px;border-radius:12px;font-family:inherit}
+.ow-stage .i{font-size:13px;line-height:1}
+.ow-stage .c{font-size:17px;font-weight:800;color:var(--text);line-height:1.2}
+.ow-stage .l{font-size:8.5px;text-transform:uppercase;letter-spacing:.07em}
+.ow-stage.on{background:radial-gradient(ellipse at center,rgba(46,230,111,.15),rgba(46,230,111,0) 78%);color:var(--text)}
+.ow-stage.z .c{color:var(--dim);font-weight:600}
+.ow-row{display:flex;align-items:center;gap:11px;padding:7px 8px;border-radius:10px;cursor:pointer}
+.ow-row:hover{background:rgba(46,230,111,.05)}
+.ow-row .nm{font-weight:700;font-size:13px;width:185px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ow-row .ow-bar{flex:1;margin:0}
+.ow-row .sc{font-size:11px;font-weight:800;width:26px;text-align:right}
+.ow-row .ag{font-size:10.5px;color:var(--dim);white-space:nowrap;width:64px;text-align:right}
+.ow-drawer{display:none;padding:4px 10px 12px 16px;font-size:12px;color:var(--dim);line-height:1.6}
+.ow-drawer b{color:var(--text)}
+.ow-troph{display:flex;gap:9px;flex-wrap:wrap;margin:4px 0 2px}
+.ow-tro{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;background:radial-gradient(ellipse at center,rgba(46,230,111,.13),rgba(46,230,111,0) 86%);font-size:12px;font-weight:700}
+.ow-mailhd{display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--dim);font-size:11.5px;margin-top:7px;padding:3px 0}
+.ow-mailhd:hover{color:var(--text)}
+.focus{list-style:none} .focus li{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.focus .rank{font-weight:800;color:var(--cyan)}
+.focus .chk{width:18px;height:18px;border:2px solid #3a465f;border-radius:6px;cursor:pointer;flex-shrink:0}
+.focus .chk:hover{border-color:var(--accent)}
+.focus .chk.on{background:var(--green);border-color:var(--green)}
+.focus li.fdone .ftxt{text-decoration:line-through;color:var(--dim)}
+.proj-h{font-size:13px;font-weight:700;margin:14px 0 6px;color:#c7d2e6}.proj-h .n{color:var(--dim);font-weight:600}
+.task{display:flex;gap:10px;padding:8px;border-radius:9px}
+.task:hover{background:var(--card)}
+.chk{width:18px;height:18px;border:2px solid #3a465f;border-radius:6px;cursor:pointer;flex-shrink:0;margin-top:1px}
+.chk:hover{border-color:var(--accent)}
+.task.done .chk{background:var(--green);border-color:var(--green)} .task.done .t-title{text-decoration:line-through;color:var(--dim)}
+.t-title{font-size:14px}.t-meta{display:flex;gap:7px;margin-top:3px;flex-wrap:wrap;align-items:center}
+.badge{font-size:10px;font-weight:700;padding:1px 7px;border-radius:5px}
+.p0{background:rgba(248,113,113,.18);color:#fca5a5}.p1{background:rgba(251,146,60,.18);color:#fdba74}
+.p2{background:rgba(251,191,36,.16);color:#fcd34d}.p3{background:rgba(138,148,168,.14);color:var(--dim)}
+.due{font-size:11px;color:var(--dim)}.due.over{color:var(--red);font-weight:700}
+.agentHero{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.agentHero .big{font-size:40px}.agentHero h2{font-size:22px}
+.agentDesc{color:var(--dim);font-size:14px;line-height:1.6;max-width:620px}
+.statRow{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.statCard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:130px}
+.statCard .v{font-size:24px;font-weight:800}
+.statCard .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
+.statCard .d{font-size:12px;margin-top:4px}
+.statCard .up{color:#5be584}.statCard .down{color:#fca5a5}
+.dm{padding:11px 2px;border-bottom:1px solid var(--line);text-align:left}
+.dm:last-child{border-bottom:0}
+.dm-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.dm-from{font-weight:700;font-size:14px;text-align:left;color:var(--text)}
+.dm-when{margin-left:8px;font-weight:500;font-size:11px;color:var(--dim);opacity:.8}
+.dm-arch{background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:7px;padding:3px 9px;font-size:11px;cursor:pointer;white-space:nowrap}
+.dm-arch:hover{background:var(--card2);color:var(--text)}
+.dm-note{margin-top:8px;font-size:12px;color:var(--dim);font-style:italic}
+.dm-note.warn{color:#e3a55f;font-style:normal}
+.dm-when.expired{color:#e3705f;opacity:1}
+.dm-raw{margin-left:7px;font-size:9px;letter-spacing:.3px;color:var(--dim);opacity:.55;border:1px solid var(--line);border-radius:5px;padding:1px 4px;text-transform:uppercase}
+.dm-err{margin-top:6px;font-size:11px;color:#e3705f;line-height:1.35}
+.dm-text{color:var(--dim);font-size:13px;margin-top:3px;text-align:left}
+.dm-reply{display:flex;gap:6px;margin-top:8px}
+.dm-input{flex:1;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;-webkit-user-select:text}
+.dm-input:focus{border-color:var(--accent)}
+.dm-btn{background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:0 11px;font-size:12px;cursor:pointer}
+.dm-btn.send{background:#16341f;border-color:#1f5132}
+.dm-btn.deny{background:#3a1717;border-color:#5a2020}
+.dm-btn:hover{filter:brightness(1.3)}
+.clip{padding:12px 2px;border-bottom:1px solid var(--line);text-align:left}
+.clip:last-child{border-bottom:0}
+.clip-top{display:flex;align-items:center;gap:9px}
+.clip-title{font-weight:700;font-size:14px;color:var(--text)}
+.clip-vid{width:100%;max-height:340px;margin-top:9px;border-radius:10px;background:#000;border:1px solid var(--line)}
+.clip-cap{color:var(--dim);font-size:12px;margin-top:5px;line-height:1.4}
+.clip-actions{display:flex;align-items:center;gap:6px;margin-top:9px}
+.vbadge{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:24px;padding:0 6px;border-radius:7px;font-size:12px;font-weight:800;background:var(--card2);border:1px solid var(--line);color:var(--dim)}
+.vbadge.hot{background:#16341f;border-color:#2a7a45;color:#5fe39a}
+.pf{display:inline-block;min-width:18px;height:18px;padding:0 3px;border-radius:5px;font-size:11px;font-weight:800;text-align:center;line-height:18px;margin-right:7px;vertical-align:middle;color:#fff}
+.pf.ig{background:linear-gradient(45deg,#f09433,#dc2743,#bc1888)}
+.pf.fb{background:#1877f2}
+.pf.tt{background:#000;color:#25f4ee}
+.pf.yt{background:#ff0000}
+.pf.sms{background:#2ea043}
+.pf.dm0{background:#2a3a2c;color:#9fbfa8}
+.buildBtn{margin-top:18px;background:linear-gradient(90deg,#16a34a,#065f46);border:none;color:#eaffef;border-radius:10px;padding:11px 18px;font-size:13px;font-weight:700;cursor:pointer}
+.loading,.empty{color:var(--dim);font-size:13px;padding:18px;text-align:center}
+
+/* ---------- COMPOSE ---------- */
+.cmp-accts{display:flex;flex-wrap:wrap;gap:8px}
+.cmp-acct{display:inline-flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer;user-select:none}
+.cmp-acct:hover{border-color:var(--accent)}
+.cmp-acct.on{background:#16341f;border-color:#2a7a45;color:#dffbe8}
+.cmp-acct input{accent-color:var(--green)}
+.cmp-acct .pl{font-size:11px;color:var(--dim)}
+.cmp-acct.on .pl{color:#9fe3b6}
+.cmp-area,.cmp-input{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px 12px;font-size:14px;outline:none;-webkit-user-select:text;font-family:inherit}
+.cmp-area:focus,.cmp-input:focus{border-color:var(--accent)}
+.cmp-area{resize:vertical;line-height:1.5}
+.cmp-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.cmp-row .cmp-input{flex:1;min-width:160px}
+.cmp-date{max-width:260px}
+.cmp-radio{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer}
+.cmp-radio input{accent-color:var(--green)}
+.cmp-now{color:#fca5a5}
+.cmp-result{margin-top:12px;font-size:13px;line-height:1.5}
+.cmp-result.ok{color:#5be584}
+.cmp-result.err{color:#fca5a5}
+
+/* ---------- DOCK ---------- */
+.dock{display:flex;gap:9px;align-items:center;padding:12px 18px;border-top:1px solid var(--line);background:rgba(8,11,18,.7);backdrop-filter:blur(10px)}
+.mic{width:46px;height:46px;border-radius:50%;border:none;background:linear-gradient(180deg,#22c55e,#15803d);color:#04120a;font-size:18px;cursor:pointer;flex-shrink:0;box-shadow:0 4px 16px rgba(34,197,94,.45)}
+.mic.live{background:linear-gradient(180deg,#ef4444,#b91c1c);animation:micpulse 1s infinite}
+@keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
+.dock input{flex:1;background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:11px;padding:11px 14px;font-size:14px;outline:none;-webkit-user-select:text}
+.dock input:focus{border-color:var(--accent)}
+.dock .send{background:#16301f;border:1px solid var(--line);color:var(--text);border-radius:11px;padding:0 16px;height:46px;font-weight:600;cursor:pointer}
+.histBtn{background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:11px;height:46px;width:46px;font-size:16px;cursor:pointer}
+/* transcript overlay */
+#hist{position:absolute;right:18px;bottom:78px;width:340px;max-height:55%;overflow-y:auto;background:rgba(12,17,27,.96);
+  border:1px solid var(--line);border-radius:14px;padding:12px;display:none;flex-direction:column;gap:8px;z-index:20;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+#hist.show{display:flex}
+.msg{max-width:90%;padding:8px 11px;border-radius:12px;font-size:13px;-webkit-user-select:text}
+.msg.you{align-self:flex-end;background:var(--accent);color:#04120a}
+.msg.mel{align-self:flex-start;background:var(--card2);border:1px solid var(--line)}
