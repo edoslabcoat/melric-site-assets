@@ -101,6 +101,7 @@ function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function smooth(e0,e1,x){ var t=clamp((x-e0)/(e1-e0),0,1); return t*t*(3-2*t); }
 
 var P=0, PT=0, lineGrow=0, elecOn=0, flowOpen=false, contactOpen=false, personalMode=false;
+var sendPulse=null, _cardEntered=-1;
 
 /* storyboard bands */
 var CARD_BANDS=[ [0.17,0.32], [0.32,0.47], [0.47,0.62] ];
@@ -131,6 +132,14 @@ function cardState(){
 
 function applyStoryboard(){
   var cs=cardState();
+
+  /* entering a card beat: fire a signal at that node first, it ignites on hit */
+  if(cs){
+    if(_cardEntered!==cs.i && cs.t<0.5){
+      _cardEntered=cs.i;
+      if(sendPulse&&!REDUCED) sendPulse(NODES[cs.i],0.02);
+    }
+  } else _cardEntered=-1;
   var reveal=smooth(REVEAL,REVEAL+0.05,P);
   var flipT=smooth(FLIP,FLIP+0.035,P);
 
@@ -256,6 +265,7 @@ function startNeuro(){
   function resize(){ W=cv.width=stage.clientWidth||900; H=cv.height=stage.clientHeight||600; }
   resize(); window.addEventListener('resize',function(){ clearTimeout(cv._rt); cv._rt=setTimeout(function(){ resize(); layoutHub(); },180); });
   var pulses=[];
+  sendPulse=function(a,sp){ pulses.push({a:a,t:0,sp:sp||0.012}); };
   (function frame(now){
     now=now||performance.now(); ctx.clearRect(0,0,W,H);
     var cx=W/2,cy=H/2;

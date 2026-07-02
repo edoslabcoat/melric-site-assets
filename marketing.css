@@ -160,3 +160,35 @@ body.reduced .orb{background:radial-gradient(circle at 50% 45%,rgba(46,230,111,.
   #nodeCard .ncline{font-size:13.5px}
   #modeTog{top:56px}
 }
+
+/* ============================== v3.2 layer ================================
+   Nodes 2x, app-style lit pucks: glowing circle behind each glyph. */
+.node{width:180px;padding:10px 8px}
+.node .ico{width:88px;height:88px;margin:0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 42%,rgba(46,230,111,.34),rgba(46,230,111,.12) 52%,rgba(46,230,111,.04) 74%,rgba(46,230,111,0) 100%);
+  border:1px solid rgba(94,255,160,.4);
+  box-shadow:0 0 26px rgba(46,230,111,.38),inset 0 0 20px rgba(46,230,111,.2)}
+.node .ico svg{width:40px;height:40px;stroke-width:1.4}
+.node .nm{font-size:15px;font-weight:700;margin-top:12px;letter-spacing:.08em;color:#fff;
+  text-shadow:0 1px 4px rgba(0,0,0,.95),0 2px 10px rgba(0,0,0,.85),0 0 12px rgba(46,230,111,.6)}
+.node.ghost{width:140px}
+.node.ghost .ico{width:64px;height:64px;box-shadow:0 0 18px rgba(46,230,111,.28),inset 0 0 14px rgba(46,230,111,.14)}
+.node.ghost .ico svg{width:28px;height:28px}
+.node.ghost .nm{font-size:12px}
+.node.flare .ico{border-color:rgba(94,255,160,.95);
+  box-shadow:0 0 46px rgba(94,255,160,.75),inset 0 0 26px rgba(46,230,111,.4);
+  background:radial-gradient(circle at 50% 42%,rgba(94,255,160,.5),rgba(46,230,111,.18) 52%,rgba(46,230,111,.05) 74%,rgba(46,230,111,0) 100%);
+  transition:box-shadow .18s ease-out,border-color .18s ease-out}
+.node.lit .ico{border-color:rgba(94,255,160,.85);
+  box-shadow:0 0 40px rgba(94,255,160,.6),inset 0 0 24px rgba(46,230,111,.32)}
+
+@media (max-width:700px){
+  .node{width:112px;padding:7px 5px}
+  .node .ico{width:56px;height:56px}
+  .node .ico svg{width:26px;height:26px}
+  .node .nm{font-size:11px;margin-top:7px}
+  .node.ghost{width:92px}
+  .node.ghost .ico{width:44px;height:44px}
+  .node.ghost .ico svg{width:20px;height:20px}
+  .node.ghost .nm{font-size:9.5px}
+}
