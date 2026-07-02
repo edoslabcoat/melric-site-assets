@@ -214,7 +214,7 @@ function parkForm(){
 function placeForm(slot){
   var wrap=$('accessFormWrap'); if(!wrap||!slot) return;
   var field=document.getElementById('qualifier-path');
-  if(field) field.value=answers.join(' | ')||'direct';
+  if(field){ field.type='hidden'; field.value=answers.join(' | ')||'direct'; }
   slot.appendChild(wrap);
 }
 function renderStep(key){
@@ -268,6 +268,9 @@ function boot3d(){
 
 window.addEventListener('load',function(){
   buildRing();
+  var cslot=$('contactFormSlot'), cwrap=$('contactFormWrap');
+  if(cslot&&cwrap) cslot.appendChild(cwrap);
+  var qf=document.getElementById('qualifier-path'); if(qf) qf.type='hidden';
   requestAnimationFrame(layoutHub); setTimeout(layoutHub,200); setTimeout(layoutHub,600);
   startNeuro(); boot3d(); applyStoryboard(); tick();
   var hint=$('hint'); if(hint&&('ontouchstart' in window)) hint.textContent='Swipe';
