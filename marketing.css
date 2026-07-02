@@ -393,3 +393,25 @@ body.nodeFocus #modeTog,body.flowMode #modeTog,body.nodeFocus #cockCap,body.flow
 body.familyMode .node.widget{background:none;border:none;box-shadow:none;backdrop-filter:none}
 .node.widget.flare,body.familyMode .node.widget.flare{background:none;border:none;box-shadow:none}
 .node.widget.lit,body.familyMode .node.widget.lit{background:none;border:none;box-shadow:none}
+
+
+/* v5.2: qualifier answers read as BUTTONS. Wider spacing, green light coming
+   from BEHIND each option (soft pulsing backlight), hover glows brighter.
+   Still glowing text, never pills. */
+#flow .opts{gap:70px;margin-top:10px}
+#flow.approval .opts{gap:64px}
+#flow .opt{position:relative;padding:12px 20px}
+#flow .opt::before{content:'';position:absolute;inset:-16px -28px;border-radius:50%;z-index:-1;
+  background:radial-gradient(ellipse at center,rgba(46,230,111,.30),rgba(46,230,111,.11) 48%,rgba(46,230,111,0) 74%);
+  animation:optbreathe 3.4s ease-in-out infinite;transition:opacity .25s}
+@keyframes optbreathe{0%,100%{opacity:.55;transform:scale(.96)}50%{opacity:.95;transform:scale(1.05)}}
+#flow .opt:hover{color:#fff;text-shadow:0 0 14px rgba(94,255,160,1),0 0 34px rgba(46,230,111,.9)}
+#flow .opt:hover::before{animation:none;opacity:1;transform:scale(1.12);
+  background:radial-gradient(ellipse at center,rgba(94,255,160,.46),rgba(46,230,111,.18) 50%,rgba(46,230,111,0) 78%)}
+@media (max-width:700px){
+  #flow .opts{gap:34px}
+  #flow .opt{padding:8px 10px}
+}
+@media (prefers-reduced-motion: reduce){
+  #flow .opt::before{animation:none}
+}
