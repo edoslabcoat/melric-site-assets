@@ -1,13 +1,17 @@
-/* MELRIC.AI marketing site storyboard (production v4).
+/* MELRIC.AI marketing site storyboard (production v5).
    Pinned view, wheel/touch/keys drive it:
-   orb + hero -> C-suite rings in (pulse-announced, staggered) -> zoom cards
-   (CMO/CFO/COO, pulse ignites the node first) -> C-suite dissolves -> the
-   business Melric: live widget nodes ring in staggered (Money made, To-do,
-   Outreach, Social, Email, Morning brief) + the app's Work|Family toggle at
-   the bottom -> the toggle FLIPS (light + animated knob + soft tick) and the
-   ring morphs to family widgets under the app's family-blue tint -> the ask
-   as a true Melric approval layer (orb rises, Melric captions on top) ->
-   native Webflow email capture.
+   orb + hero -> C-suite rings in (pulse-announced, staggered, app-true nodes:
+   glyph + name + status + LIVE on a soft glow, no boxes) -> entering a node
+   is an app-true PAGE (all nodes clear out, the orb JUMPS to the top with its
+   letterspaced label, copy centered beneath, amber status, glowing text
+   actions, data on the outer rails) -> C-suite dissolves -> the business
+   cockpit: widget nodes ring in staggered + cockpit rails in the corners
+   (urgent, agenda, money, needs-your-reply) + the app's Work|Family toggle ->
+   the toggle FLIPS (light + knob + soft tick) and nodes, rails and light all
+   go family-blue -> the ask as a true MELRIC approval layer (ring clears, orb
+   jumps up, MELRIC captions speak) -> native Webflow email capture.
+   Node breathing feeds the corridor wall on its own plane (charge accumulates,
+   slowly decays, between pulses too) via corridorNodeFlash.
    All data capture is 100% native Webflow forms. site.js never submits. */
 (function(){
 'use strict';
@@ -35,87 +39,175 @@ var G={
 };
 function nodeSvg(n,w){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||1.3)+'" stroke-linecap="round" stroke-linejoin="round">'+(G[n]||'')+'</svg>'; }
 
-/* 3 C-suite role nodes (zoom cards), then 6 live WIDGET nodes with a work
-   face and a family face. Widget copy is illustrative, one to-do overdue. */
+/* 3 C-suite nodes (each opens an app-true page), then 6 live widget nodes
+   with a work face and a family face. App-true anatomy everywhere:
+   glyph + bold name + status line (amber when waiting) + LIVE tag. */
 var NODES=[
-  { id:'cmo', name:'CMO', svg:nodeSvg('mega'),
-    kick:'Your CMO', title:'Runs all your content.',
-    lines:['Turns one video into a week of content','Posts everywhere while you sleep','Reads the numbers, finds the winners','Doubles down on what goes viral'] },
-  { id:'cfo', name:'CFO', svg:nodeSvg('coin'),
-    kick:'Your CFO', title:'Watches the money.',
-    lines:['Every dollar tracked, in and out','Catches leaks before they cost you','Shows your next best money move','Knows your runway cold'] },
-  { id:'coo', name:'COO', svg:nodeSvg('check'),
-    kick:'Your COO', title:'Nothing slips.',
-    lines:['Every follow-up handled','Nothing falls through the cracks','Status computed, not claimed','One brain across every business'] },
+  { id:'cmo', name:'CMO', icon:'mega', st:'3 clips waiting on you', wait:true,
+    page:{ kick:'Your CMO', title:'Runs all your content.',
+      status:'waiting on you · 3 clips to approve', wait:true,
+      quote:'Turned Monday’s shoot into a week of posts.',
+      lines:['Turns one video into a week of content','Posts everywhere while you sleep','Reads the numbers, finds the winners','Doubles down on what goes viral'],
+      acts:['Approve','See the plan','details'],
+      railL:{ t:'Momentum', rows:[['12','posts this week'],['3','drafts ready'],['1','going viral']] },
+      railR:{ t:'Queue · 6', rows:['Reel: studio tour','Clip: glass pour timelapse','Post: gallery night recap','Story: behind the scenes'] } } },
+  { id:'cfo', name:'CFO', icon:'coin', st:'books current',
+    page:{ kick:'Your CFO', title:'Watches the money.',
+      status:'books current · nothing missed',
+      quote:'Caught a double charge. Got it back.',
+      lines:['Every dollar tracked, in and out','Catches leaks before they cost you','Shows your next best money move','Knows your runway cold'],
+      acts:['Approve','See the numbers','details'],
+      railL:{ t:'Money', rows:[['$4,210','this week'],['+12%','margin'],['9 mo','runway']] },
+      railR:{ t:'Watching · 4', rows:['Q3 estimates due soon','Subscription creep found','Invoice 204 unpaid 12d','Ad spend near the cap'] } } },
+  { id:'coo', name:'COO', icon:'check', st:'87 open · all projects',
+    page:{ kick:'Your COO', title:'Nothing slips.',
+      status:'waiting 2 days · 1 decision is yours', wait:true,
+      quote:'Followed up so you did not have to.',
+      lines:['Every follow-up handled','Nothing falls through the cracks','Status computed, not claimed','One brain across every business'],
+      acts:['Approve','See open loops','details'],
+      railL:{ t:'Loops', rows:[['14','open'],['22','closed this week'],['1','overdue']] },
+      railR:{ t:'Follow-ups · 5', rows:['Gallery: interested, replied','Supplier quote chased','Contract out for signature','Shoot rescheduled clean'] } } },
   { id:'g1', ghost:true,
-    work:{ icon:'coin', title:'Money made', rows:[['big','$18,420 this week'],['ok','+12% vs last week']] },
-    home:{ icon:'pulse', title:'Fitness', rows:[['big','11 day streak'],['ok','3 of 4 workouts done']] } },
+    work:{ icon:'coin', title:'Money', st:'$18,420 this week' },
+    home:{ icon:'pulse', title:'Fitness', st:'11 day streak' } },
   { id:'g2', ghost:true,
-    work:{ icon:'list', title:'To-do', rows:[['done','Send gallery follow-ups'],['n','Approve 3 clips'],['warn','Pay Q3 estimates','OVERDUE']] },
-    home:{ icon:'music', title:'Reminder', rows:[['n','Kids dance recital'],['ok','Thursday 5:00pm, gift ready']] } },
+    work:{ icon:'list', title:'To-do', st:'Pay Q3 estimates · overdue', wait:true },
+    home:{ icon:'music', title:'Reminder', st:'Recital Thursday 5pm', wait:true } },
   { id:'g3', ghost:true,
-    work:{ icon:'send', title:'Outreach', rows:[['n','14 leads contacted'],['ok','3 replies waiting on you']] },
-    home:{ icon:'cal', title:'Calendar', rows:[['n','Dinner with Melody, 7pm'],['ok','Weekend: lake trip planned']] } },
+    work:{ icon:'send', title:'Outreach', st:'3 replies waiting on you' },
+    home:{ icon:'cal', title:'Calendar', st:'Dinner with Melody, 7pm' } },
   { id:'g4', ghost:true,
-    work:{ icon:'share', title:'Social', rows:[['n','6 posts scheduled'],['ok','1 going viral right now']] },
-    home:{ icon:'heart', title:'Family', rows:[['n','Call Mom on Sunday'],['ok','Anniversary in 12 days']] } },
+    work:{ icon:'share', title:'Social', st:'Photos to post' },
+    home:{ icon:'heart', title:'Family', st:'Anniversary in 12 days' } },
   { id:'g5', ghost:true,
-    work:{ icon:'mail', title:'Email', rows:[['n','23 triaged this morning'],['ok','2 need your eyes']] },
-    home:{ icon:'plane', title:'Travel', rows:[['n','Watching flights: Maui'],['ok','Price dropped $180']] } },
+    work:{ icon:'mail', title:'Email', st:'23 triaged this morning' },
+    home:{ icon:'plane', title:'Travel', st:'Maui fare dropped $180' } },
   { id:'g6', ghost:true,
-    work:{ icon:'sunrise', title:'Morning brief', rows:[['n','Ready at 6:00am'],['ok','3 priorities picked']] },
-    home:{ icon:'card', title:'Bills', rows:[['n','All paid, on time'],['ok','Saved $62 this month']] } }
+    work:{ icon:'sunrise', title:'Morning brief', st:'Ready at 6:00am' },
+    home:{ icon:'card', title:'Bills', st:'All paid, on time' } }
 ];
 var MAIN=3;
+
+/* cockpit rails: the corners of the business beat, straight from the app */
+var RAILS={
+  work:{
+    tl:[{t:'Urgent / ASAP',meta:'25 pressing',rows:[
+      ['','6 proposals from MELRIC'],
+      ['warn','Content runway: 0 days left'],
+      ['','Northside Gallery replied: interested'],
+      ['warn','Inventory count · due Jun 25'],
+      ['','Edit launch footage · Aug 7']]}],
+    tr:[{t:'Today’s agenda',rows:[
+      ['ok','Nothing on the calendar today.'],
+      ['ok','A clean runway. Use it.']]},
+      {t:'Companies & clients',rows:[
+      ['','Storm Glassworks'],['','Wheelhouse Magazine'],['','Lab-Coat'],['','VOZ']]}],
+    bl:[{t:'Money',rows:[
+      ['big','$18,420'],
+      ['ok','this week · +12%'],
+      ['','Top client · $8,865 last 30 days']]}],
+    br:[{t:'Needs your reply',rows:[
+      ['warn','2 emails need you'],
+      ['','5 DMs waiting'],
+      ['','1 comment flagged']]}],
+    cap:'YOUR COCKPIT'
+  },
+  home:{
+    tl:[{t:'Today at home',rows:[
+      ['warn','Recital Thursday 5:00pm'],
+      ['','Gift wrapped and ready'],
+      ['','Call Mom on Sunday']]}],
+    tr:[{t:'This weekend',rows:[
+      ['','Lake trip planned'],
+      ['ok','Weather looks perfect']]},
+      {t:'The people',rows:[['','Melody'],['','The kids'],['','Mom']]}],
+    bl:[{t:'Saved',rows:[
+      ['big','$62'],
+      ['ok','this month, on autopilot'],
+      ['','Bills: all paid, on time']]}],
+    br:[{t:'Coming up',rows:[
+      ['','Anniversary in 12 days'],
+      ['','Maui fare dropped $180']]}],
+    cap:'YOUR HOME'
+  }
+};
 
 function $(id){ return document.getElementById(id); }
 var stage=$('stage');
 
-function widgetHtml(d){
-  var h='<div class="wt">'+nodeSvg(d.icon,1.4)+'<span>'+d.title+'</span></div>';
-  d.rows.forEach(function(r){
-    var cls=r[0]==='n'?'':' '+r[0];
-    h+='<div class="wl'+cls+'">'+r[1]+(r[2]?'<span class="tag">'+r[2]+'</span>':'')+'</div>';
-  });
-  return h;
+/* app-true node: glyph, bold name, status line (amber when waiting), LIVE */
+function nodeHtml(d){
+  return '<div class="ico">'+nodeSvg(d.icon,1.5)+'</div>'
+    +'<div class="nm">'+d.title+'</div>'
+    +'<div class="st'+(d.wait?' wait':'')+'">'+d.st+'</div>'
+    +'<div class="live">LIVE</div>';
 }
 function setNodeContent(a,mode){
   var el=$('node-'+a.id); if(!el) return;
-  if(a.ghost){ el.innerHTML=widgetHtml(a[mode||'work']); }
-  else { el.innerHTML='<div class="ico">'+a.svg+'</div><div class="nm">'+a.name+'</div>'; }
+  if(a.ghost){ el.innerHTML=nodeHtml(a[mode||'work']); }
+  else { el.innerHTML=nodeHtml({icon:a.icon,title:a.name,st:a.st,wait:a.wait}); }
+}
+function railHtml(secs){
+  var h='';
+  secs.forEach(function(sec){
+    h+='<div class="rt">'+sec.t+(sec.meta?'<span class="rmeta">'+sec.meta+'</span>':'')+'</div>';
+    sec.rows.forEach(function(r){ h+='<div class="rr'+(r[0]?' '+r[0]:'')+'">'+r[1]+'</div>'; });
+  });
+  return h;
+}
+function setRails(mode){
+  var d=RAILS[mode];
+  var map={railTL:d.tl,railTR:d.tr,railBL:d.bl,railBR:d.br};
+  Object.keys(map).forEach(function(id){ var r=$(id); if(r) r.innerHTML=railHtml(map[id]); });
+  var cc=$('cockCap'); if(cc) cc.textContent=d.cap;
 }
 function buildRing(){
-  NODES.forEach(function(a){
+  NODES.forEach(function(a,i){
     var el=document.createElement('div');
     el.className='node is-live'+(a.ghost?' widget':'');
     el.id='node-'+a.id;
+    el.style.setProperty('--bd',(-(i*530))+'ms'); /* staggered breathing */
     stage.appendChild(el);
     setNodeContent(a,'work');
     el.onclick=function(){ openFlow(); };
   });
-  var card=document.createElement('div');
-  card.id='nodeCard';
-  card.innerHTML='<div class="kick"></div><h3></h3><div class="nclines"></div>';
-  document.body.appendChild(card);
+  /* the in-node page (app-true, no card box) */
+  var pg=document.createElement('div');
+  pg.id='nodePage';
+  document.body.appendChild(pg);
+  /* letterspaced label under the risen orb, like the app section pages */
+  var tag=document.createElement('div');
+  tag.id='orbTag';
+  document.body.appendChild(tag);
+  /* cockpit rails, four corners */
+  ['railTL','railTR','railBL','railBR'].forEach(function(id){
+    var r=document.createElement('div'); r.className='rail'; r.id=id;
+    document.body.appendChild(r);
+  });
   /* the app's Work|Family toggle, bottom center, with a sliding knob */
   var tog=document.createElement('div');
   tog.id='modeTog';
   tog.innerHTML='<span class="mt-knob"></span><button class="mt-opt on" id="mtWork">Work</button><button class="mt-opt" id="mtFamily">Family</button>';
   document.body.appendChild(tog);
-  /* Melric's caption bar (top): what Melric says during the approval */
+  var cc=document.createElement('div');
+  cc.id='cockCap';
+  document.body.appendChild(cc);
+  setRails('work');
+  /* MELRIC's caption bar (top): what MELRIC says during the approval */
   var cap=document.createElement('div');
   cap.id='melCap';
   document.body.appendChild(cap);
   layoutHub(); placeKnob();
 }
 /* mains on the inner ring; widgets between them on a wider ring */
+var orbIsUp=false;
 function layoutHub(){
   var W=stage.clientWidth,H=stage.clientHeight;
   var margin=(W<700||H<560)?120:185;
   var cx=W/2,cy=H/2,R=Math.max(margin,Math.min(W,H)/2-margin);
   var R2=Math.max(230,Math.min(W,H)/2-140);
   var svg=$('links'); if(svg) svg.setAttribute('viewBox','0 0 '+W+' '+H);
-  var ob=$('orb'); if(ob&&!flowOpen){ ob.style.left=cx+'px'; ob.style.top=cy+'px'; }
+  var ob=$('orb'); if(ob&&!flowOpen&&!orbIsUp){ ob.style.left=cx+'px'; ob.style.top=cy+'px'; }
   var gi=0;
   NODES.forEach(function(a,i){
     var ang;
@@ -135,22 +227,22 @@ function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function smooth(e0,e1,x){ var t=clamp((x-e0)/(e1-e0),0,1); return t*t*(3-2*t); }
 
 var P=0, PT=0, lineGrow=0, elecOn=0, flowOpen=false, contactOpen=false, familyOn=false;
-var sendPulse=null, _cardEntered=-1;
+var sendPulse=null, _cardEntered=-1, _focusOn=false;
 
 /* storyboard bands */
 var CARD_BANDS=[ [0.16,0.30], [0.30,0.44], [0.44,0.58] ];
 var DISSOLVE=[0.58,0.63];   /* C-suite fades out */
-var GHOST_START=0.62;       /* widgets ring in staggered */
+var GHOST_START=0.62;       /* widgets + rails ring in staggered */
 var FLIP=0.815;             /* the toggle flips to Family */
 
 var CAPS=[
   {at:0.095,until:0.16,txt:'You just hired your C-suite.'},
-  {at:0.645,until:0.695,txt:'And Melric is not one product.'},
+  {at:0.645,until:0.695,txt:'And MELRIC is not one product.'},
   {at:0.695,until:0.75,txt:'It is custom built for you and your business.'},
   {at:0.75,until:0.805,txt:'More money. More time. More leads.'},
-  {at:0.845,until:0.90,txt:'Because Melric runs your home too.'},
+  {at:0.845,until:0.90,txt:'Because MELRIC runs your home too.'},
   {at:0.90,until:0.945,txt:'More time for your family. That is the point.'},
-  {at:0.945,until:2,txt:'See if Melric fits your life.'}
+  {at:0.945,until:2,txt:'See if MELRIC fits your life.'}
 ];
 
 function cardState(){
@@ -165,7 +257,8 @@ function cardState(){
   return null;
 }
 
-/* ---- the flip ceremony: light, animated knob, soft tick, staggered morph ---- */
+/* ---- the flip ceremony: light, animated knob, soft tick, staggered morph.
+   Nodes, rails and the caption all cross to the family-blue world. ---- */
 function setFamily(on){
   if(familyOn===on) return;
   familyOn=on;
@@ -191,6 +284,16 @@ function setFamily(on){
       },REDUCED?0:180);
     },delay);
   });
+  /* rails morph right behind the nodes */
+  var rs=['railTL','railTR','railBL','railBR'];
+  rs.forEach(function(id,k){
+    var r=$(id); if(!r) return;
+    setTimeout(function(){
+      r.classList.add('morphing');
+      setTimeout(function(){ r.classList.remove('morphing'); },REDUCED?0:220);
+    },REDUCED?0:120+k*90);
+  });
+  setTimeout(function(){ setRails(on?'home':'work'); },REDUCED?0:300);
 }
 function tickSound(){
   try{
@@ -209,14 +312,46 @@ function tickSound(){
   }catch(e){}
 }
 
+/* the orb jumps to the top (springy overshoot lives in the CSS transition) */
+function orbUp(){
+  var orb=$('orb'); if(!orb) return;
+  orbIsUp=true;
+  orb.style.left=(stage.clientWidth/2)+'px';
+  orb.style.top=(stage.clientHeight*0.17)+'px';
+  orb.style.transform='translate(-50%,-50%) scale(.62)';
+}
+function orbDown(){
+  var orb=$('orb'); if(!orb) return;
+  orbIsUp=false;
+  orb.style.transform='translate(-50%,-50%)';
+  layoutHub();
+}
+
 function applyStoryboard(){
   var cs=cardState();
   var dis=smooth(DISSOLVE[0],DISSOLVE[1],P);      /* C-suite out */
   var flipT=smooth(FLIP,FLIP+0.02,P);
   setFamily(flipT>0.5);
 
+  /* the moment a node page (or the ask) owns the screen, the ring clears out
+     and the orb jumps up. Nothing else stays on stage with the orb. */
+  var focus=!!(cs&&cs.vis>0.30)&&!flowOpen;
+  if(focus){
+    var tg=$('orbTag'); if(tg&&NODES[cs.i]) tg.textContent=NODES[cs.i].name;
+  }
+  if(focus!==_focusOn){
+    _focusOn=focus;
+    document.body.classList.toggle('nodeFocus',focus);
+    if(!flowOpen){ if(focus) orbUp(); else orbDown(); }
+  }
+  var hideRing=flowOpen||focus;
+
   var tog=$('modeTog');
-  if(tog) tog.style.opacity=((flowOpen||contactOpen)?0:smooth(GHOST_START+0.02,GHOST_START+0.06,P)).toFixed(3);
+  var togOp=(flowOpen||contactOpen)?0:smooth(GHOST_START+0.02,GHOST_START+0.06,P);
+  if(tog) tog.style.opacity=togOp.toFixed(3);
+  var railOp=(flowOpen||contactOpen)?0:smooth(GHOST_START+0.02,GHOST_START+0.08,P);
+  ['railTL','railTR','railBL','railBR'].forEach(function(id){ var r=$(id); if(r) r.style.opacity=railOp.toFixed(3); });
+  var cc=$('cockCap'); if(cc) cc.style.opacity=togOp.toFixed(3);
 
   var gi=0;
   NODES.forEach(function(a,i){
@@ -232,19 +367,24 @@ function applyStoryboard(){
     if(rv<0.04) a._seen=false;
 
     if(cs){ if(i===cs.i) rv=Math.max(rv,0.25); else rv*=(1-0.8*cs.vis); }
-    a._rv=rv;
+    a._rv=hideRing?0:rv;
     var el=$('node-'+a.id); if(el){
       el.style.opacity=rv.toFixed(3);
       var sc=0.55+0.45*rv;
       if(cs&&i===cs.i) sc+=0.3*cs.vis;
       el.style.transform='translate(-50%,-50%) scale('+sc.toFixed(3)+')';
-      el.style.pointerEvents=(rv>0.9&&!cs)?'auto':'none';
-      el.classList.toggle('lit',!!(cs&&i===cs.i&&cs.vis>0.3));
+      el.style.pointerEvents=(rv>0.9&&!cs&&!hideRing)?'auto':'none';
+      el.classList.toggle('lit',!!(cs&&i===cs.i&&cs.vis>0.15&&!focus));
     }
   });
 
+  /* the pulse rides out and ignites the node as its band opens */
+  if(cs&&cs.t<0.5){
+    if(_cardEntered!==cs.i){ _cardEntered=cs.i; if(sendPulse&&!REDUCED) sendPulse(NODES[cs.i],0.02); }
+  } else if(!cs){ _cardEntered=-1; }
+
   lineGrow=smooth(0.07,0.15,P);
-  elecOn=REDUCED?0:smooth(0.12,0.20,P)*(cs?(1-0.55*cs.vis):1);
+  elecOn=(REDUCED||hideRing)?0:smooth(0.12,0.20,P)*(cs?(1-0.55*cs.vis):1);
 
   var hero=$('hero'); if(hero) hero.style.opacity=(1-smooth(0.03,0.10,P)).toFixed(3);
   var hint=$('hint'); if(hint) hint.style.opacity=(1-smooth(0.02,0.08,P)).toFixed(3);
@@ -252,7 +392,7 @@ function applyStoryboard(){
   var cap=''; CAPS.forEach(function(c){ if(P>=c.at&&P<c.until) cap=c.txt; });
   var pc=$('phaseCap'); if(pc){ pc.textContent=cap; pc.style.opacity=(cap&&!flowOpen&&!contactOpen&&(!cs||cs.vis<0.2))?1:0; }
 
-  renderCard(cs);
+  renderPage(cs);
 
   var z=cs?cs.vis:0, a2=cs?NODES[cs.i]:null;
   if(a2&&a2._x!=null){ stage.style.transformOrigin=a2._x+'px '+a2._y+'px'; }
@@ -267,23 +407,33 @@ function applyStoryboard(){
   if(P>0.968 && !flowOpen && !contactOpen) openFlow();
 }
 
-function renderCard(cs){
-  var card=$('nodeCard'); if(!card) return;
-  if(!cs||cs.vis<=0.02){ card.style.opacity=0; card.style.pointerEvents='none'; card._i=null; return; }
-  var a=NODES[cs.i];
-  if(card._i!==cs.i){
-    card._i=cs.i;
-    card.querySelector('.kick').textContent=a.kick;
-    card.querySelector('h3').textContent=a.title;
-    card.querySelector('.nclines').innerHTML=a.lines.map(function(l){ return '<div class="ncline">'+l+'</div>'; }).join('');
+/* the in-node page: app-true, like the app's section pages. No card box.
+   Center column under the risen orb, data on the outer rails. */
+function renderPage(cs){
+  var pg=$('nodePage'); if(!pg) return;
+  if(!cs||cs.vis<=0.02){ pg.style.opacity=0; pg._i=null; return; }
+  var a=NODES[cs.i], p=a.page; if(!p) return;
+  if(pg._i!==cs.i){
+    pg._i=cs.i;
+    var h='<div class="npl"><div class="rt">'+p.railL.t+'</div>'
+      +p.railL.rows.map(function(r){ return '<div class="nps"><b>'+r[0]+'</b>'+r[1]+'</div>'; }).join('')+'</div>';
+    h+='<div class="npr"><div class="rt">'+p.railR.t+'</div>'
+      +p.railR.rows.map(function(r){ return '<div class="rr">'+r+'</div>'; }).join('')+'</div>';
+    h+='<div class="npc"><div class="kick">'+p.kick+'</div><h3>'+p.title+'</h3>'
+      +'<div class="npst'+(p.wait?' wait':'')+'">'+p.status+'</div>'
+      +'<div class="npq">“'+p.quote+'”</div>'
+      +'<div class="nclines">'+p.lines.map(function(l){ return '<div class="ncline">'+l+'</div>'; }).join('')+'</div>'
+      +'<div class="npacts">'+p.acts.map(function(t){ return '<span class="npact">'+t+'</span>'; }).join('')+'</div>'
+      +'</div>';
+    pg.innerHTML=h;
   }
-  var W=stage.clientWidth,H=stage.clientHeight,cx=W/2,cy=H/2;
-  var t=cs.vis, dx=(a._x-cx)*(1-t), dy=(a._y-cy)*(1-t), s=0.25+0.75*t;
-  card.style.opacity=t.toFixed(3);
-  card.style.transform='translate(-50%,-50%) translate('+dx.toFixed(1)+'px,'+dy.toFixed(1)+'px) scale('+s.toFixed(3)+')';
-  var lines=card.querySelectorAll('.ncline');
+  var pv=smooth(0.30,0.62,cs.vis);
+  pg.style.opacity=pv.toFixed(3);
+  var npc=pg.querySelector('.npc');
+  if(npc) npc.style.transform='translateX(-50%) translateY('+((1-pv)*26).toFixed(1)+'px)';
+  var lines=pg.querySelectorAll('.ncline');
   for(var k=0;k<lines.length;k++){
-    var th=0.26+k*0.13;
+    var th=0.32+k*0.10;
     lines[k].style.opacity=smooth(th,th+0.08,cs.t).toFixed(3);
   }
 }
@@ -320,7 +470,11 @@ function watchFps(){
   }
 }
 
-/* ---- neuro: lines + slow bright signals; nodes flare on hit ---- */
+/* ---- neuro: lines + slow bright signals; nodes flare on hit.
+   Node BREATHING feeds the corridor wall on the node's own plane: each breath
+   peak adds charge (corridorNodeFlash accumulates, then slowly wears off), so
+   the walls stay alive between pulses too. ---- */
+var BREATH=3600; /* ms, matches the CSS nbreathe cycle */
 function pulseNode(a){
   var el=$('node-'+a.id); if(!el) return;
   el.classList.add('flare'); clearTimeout(el._ft); el._ft=setTimeout(function(){ el.classList.remove('flare'); },900);
@@ -337,10 +491,20 @@ function startNeuro(){
     var cx=W/2,cy=H/2;
     var blue=document.body.classList.contains('familyMode');
     var lineCol=blue?'rgba(140,210,255,':'rgba(94,255,160,';
-    NODES.forEach(function(a){ if(a._x==null||!a._rv) return;
+    NODES.forEach(function(a,i){
+      if(a._lv==null) a._lv=0;
+      a._lv+=((a._rv||0)-a._lv)*0.10;                 /* lines ease in and out */
+      if(a._x==null||a._lv<0.01) return;
       var gx=cx+(a._x-cx)*lineGrow, gy=cy+(a._y-cy)*lineGrow;
-      ctx.strokeStyle=lineCol+(0.30*lineGrow*a._rv).toFixed(3)+')'; ctx.lineWidth=1.3;
+      ctx.strokeStyle=lineCol+(0.30*lineGrow*a._lv).toFixed(3)+')'; ctx.lineWidth=1.3;
       ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(gx,gy); ctx.stroke();
+      /* breathing charges the wall at this node's plane, between pulses too */
+      if(!REDUCED&&a._rv>0.55&&window.corridorNodeFlash){
+        var ph=((now+i*530)%BREATH)/BREATH;
+        if(ph>0.20&&ph<0.32){
+          if(!a._bf){ a._bf=true; try{ window.corridorNodeFlash(a._x/W,a._y/H,0.32); }catch(e){} }
+        } else if(ph>0.5) a._bf=false;
+      }
     });
     if(elecOn>0.2){
       NODES.forEach(function(a){ if(a._x==null||a._rv<0.6) return;
@@ -366,9 +530,10 @@ function startNeuro(){
 }
 
 /* ============================================================================
-   THE ASK, as a true Melric approval layer: the orb rises and shrinks like
-   the app's approval page, Melric's caption bar speaks on top, the question
-   and glowing options sit beneath. Ends at the native Webflow form.
+   THE ASK, as a true MELRIC approval layer: every node and rail clears out,
+   the orb JUMPS up and shrinks like the app's approval page, MELRIC's caption
+   bar speaks on top, the question and glowing options sit beneath.
+   Ends at the native Webflow form.
    ============================================================================ */
 var STEPS={
   q1:{ kick:'A quick decision', say:'Quick one before I let you in.',
@@ -378,17 +543,11 @@ var STEPS={
        q:'If something handled the time-consuming work, could you enjoy life more and make more money?',
        opts:[ {label:'Yes',next:'endGood'}, {label:'Obviously',next:'endGood'} ] },
   endGood:{ kick:'Early access', say:'I will take it from here.',
-            q:'Melric is built for exactly this.',
+            q:'MELRIC is built for exactly this.',
             body:'Custom built for you, onboarded by hand. Leave your email and we will reach out.', capture:true }
 };
 
 var answers=[];
-function orbApproval(on){
-  var orb=$('orb'); if(!orb) return;
-  var H=stage.clientHeight;
-  if(on){ orb.style.top=(H*0.17)+'px'; orb.style.transform='translate(-50%,-50%) scale(.62)'; }
-  else { orb.style.transform='translate(-50%,-50%)'; layoutHub(); }
-}
 function melSay(txt){
   var c=$('melCap'); if(!c) return;
   if(!txt){ c.classList.remove('show'); return; }
@@ -397,18 +556,20 @@ function melSay(txt){
 }
 function openFlow(){
   flowOpen=true; answers=[];
+  document.body.classList.add('flowMode');   /* the ring + rails clear out */
   $('flowScrim').classList.add('on');
   var fl=$('flow'); fl.classList.add('on'); fl.classList.add('approval');
-  orbApproval(true);
+  orbUp();                                    /* and the orb jumps */
   applyStoryboard();
   renderStep('q1');
 }
 function closeFlow(){
   flowOpen=false; PT=0.94; P=0.94;
   parkForm(); melSay('');
+  document.body.classList.remove('flowMode');
   $('flowScrim').classList.remove('on');
   var fl=$('flow'); fl.classList.remove('on'); fl.classList.remove('approval');
-  orbApproval(false);
+  orbDown();
   applyStoryboard();
 }
 function parkForm(){
