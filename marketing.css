@@ -386,3 +386,10 @@ body.nodeFocus #modeTog,body.flowMode #modeTog,body.nodeFocus #cockCap,body.flow
 @media (prefers-reduced-motion: reduce){
   .node::before{animation:none}
 }
+
+
+/* v5.1: kill every last v4 box. Widgets stay boxless in family mode and on
+   flare; the glow lives only in the radial pseudo layers. */
+body.familyMode .node.widget{background:none;border:none;box-shadow:none;backdrop-filter:none}
+.node.widget.flare,body.familyMode .node.widget.flare{background:none;border:none;box-shadow:none}
+.node.widget.lit,body.familyMode .node.widget.lit{background:none;border:none;box-shadow:none}
