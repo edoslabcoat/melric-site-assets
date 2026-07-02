@@ -48,11 +48,11 @@
     GREEN: 0x2ee66f,       // primary Matrix green
     GREEN_BRIGHT: 0x9dffc4,// highlight green toward white
     WALL_OPACITY: 0.62,    // overall wall opacity
-    EMISSIVE_INTENSITY: 0.5, // LOW self-glow — uniform self-glow is what reveals deep tunnel structure (upcoming turns). Kept low so only camera/Melric-lit NEAR digits show; the deep tunnel stays dark. Nudged up slightly to lift an over-dark background.
-    NEAR_BRIGHTNESS: 12.4, // gentle near-brightness; the light no longer defines the reach (fog does), so this just sets LIT digit brightness. +10% to brighten lit digits — fog still takes the deep ones to the same black, so the dark parts are unchanged.
+    EMISSIVE_INTENSITY: 0.62, // site v3: lifted from 0.5 (Eric: brighter overall) // LOW self-glow — uniform self-glow is what reveals deep tunnel structure (upcoming turns). Kept low so only camera/Melric-lit NEAR digits show; the deep tunnel stays dark. Nudged up slightly to lift an over-dark background.
+    NEAR_BRIGHTNESS: 14.5, // site v3: lifted from 12.4 // gentle near-brightness; the light no longer defines the reach (fog does), so this just sets LIT digit brightness. +10% to brighten lit digits — fog still takes the deep ones to the same black, so the dark parts are unchanged.
     BREATH_PERIOD: 3.6,    // seconds — matches Melric's orb breathing so the digits pulse in sync
     EMISSIVE_BREATH: 0.11, // SMALL — a big emissive swing slides the fog/visibility threshold forward & back, and that moving threshold reads as a tube-shaped hard line sweeping in the tunnel. Tiny swing = gentle shimmer, not a moving boundary.
-    FAR_DIM: 0.12,          // zero ambient — anything deeper than the viewer's plane (behind Melric) goes pure black
+    FAR_DIM: 0.18,   // site v3: lifted from 0.12          // zero ambient — anything deeper than the viewer's plane (behind Melric) goes pure black
     FOG_NEAR: 9.0,         // lit only right at the foreground / viewer's plane
     FOG_FAR: 28.0,         // (unused with exponential fog below — kept for reference)
     FOG_DENSITY: 0.024,    // fog is now the SOLE depth fade — a smooth exponential to black by ~50 units (hides deep turns) with no cutoff distance, so there is no hard edge anywhere for the tube shape to ride on.

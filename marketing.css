@@ -109,3 +109,54 @@ body.low-power #corridor{display:none}
   .node,#hero,#phaseCap,#flow .step{transition-duration:.01s}
 }
 body.reduced .orb{background:radial-gradient(circle at 50% 45%,rgba(46,230,111,.35),rgba(46,230,111,.10) 40%,transparent 65%)}
+
+/* ============================== v3 layer ==================================
+   Bigger orb, always-glowing nodes, node cards, the WORK/PERSONAL toggle. */
+
+/* Melric 50% bigger */
+.orb{width:225px;height:225px}
+
+/* nodes glow green at rest, flare bright when a signal lands */
+.node::before{opacity:.16}
+.node .ico svg{filter:drop-shadow(0 0 7px rgba(94,255,160,.75))}
+.node .nm{color:#eafff4;text-shadow:0 0 10px rgba(46,230,111,.55)}
+.node.flare::before{opacity:.55;transition:opacity .18s ease-out}
+.node.flare .ico svg{filter:drop-shadow(0 0 14px rgba(94,255,160,1))}
+.node.lit::before{opacity:.42}
+.node.lit .ico svg{filter:drop-shadow(0 0 13px rgba(94,255,160,1))}
+.node.lit .nm{color:#fff;text-shadow:0 0 14px rgba(94,255,160,.9)}
+.node.ghost{width:86px}
+.node.ghost .nm{font-size:10px;color:#cfeeda}
+
+#stage{will-change:transform}
+
+/* the in-node card: still inside Melric */
+#nodeCard{position:fixed;left:50%;top:50%;z-index:7;width:min(480px,86vw);padding:34px 38px;text-align:left;
+  background:rgba(6,14,9,.78);border:1px solid rgba(94,255,160,.28);border-radius:14px;
+  box-shadow:0 0 60px rgba(46,230,111,.14),inset 0 0 40px rgba(46,230,111,.05);
+  backdrop-filter:blur(6px);opacity:0;pointer-events:none;will-change:transform,opacity}
+#nodeCard .kick{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--accent);
+  text-shadow:0 0 12px rgba(46,230,111,.6);margin-bottom:12px}
+#nodeCard h3{font-family:'Raleway',sans-serif;font-weight:200;font-size:clamp(24px,3.4vw,36px);color:#fff;
+  margin:0 0 20px;line-height:1.1;text-shadow:0 2px 22px rgba(0,0,0,.9)}
+#nodeCard .ncline{font-size:15px;line-height:1.5;color:#dff5e6;padding:7px 0;opacity:0;
+  text-shadow:0 0 8px rgba(46,230,111,.25);border-bottom:1px solid rgba(94,255,160,.08)}
+#nodeCard .ncline:last-child{border-bottom:none}
+#nodeCard .ncline::before{content:'\203A';color:var(--cyan);margin-right:12px;
+  text-shadow:0 0 8px rgba(94,255,160,.8)}
+
+/* the WORK / PERSONAL toggle (echoes the app's mode switch) */
+#modeTog{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:8;display:flex;gap:4px;
+  padding:4px 6px;border:1px solid rgba(94,255,160,.25);border-radius:999px;background:rgba(6,14,9,.7);
+  opacity:0;pointer-events:none;transition:opacity .4s}
+#modeTog .mt{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--dim);padding:4px 14px;border-radius:999px;transition:all .35s}
+#modeTog .mt.on{color:#0a140d;background:rgba(94,255,160,.92);
+  box-shadow:0 0 18px rgba(46,230,111,.55);text-shadow:none}
+
+@media (max-width:700px){
+  .orb{width:170px;height:170px}
+  #nodeCard{padding:24px 22px}
+  #nodeCard .ncline{font-size:13.5px}
+  #modeTog{top:56px}
+}
