@@ -269,3 +269,120 @@ body.familyMode .node.widget.flare{border-color:rgba(160,220,255,.9);
   #melCap{top:58px;font-size:12.5px}
   #flow.approval{padding-top:27vh}
 }
+
+/* ============================== v5 layer ==================================
+   App-true nodes (glyph + name + status + LIVE on a soft radial glow, no
+   boxes), breathing glow, cockpit corner rails, in-node app pages with the
+   jumped-up orb + letterspaced label, full family-blue crossover. */
+
+/* nodes: no boxes, no borders. A soft radial glow that BREATHES. */
+.node,.node.widget{width:180px;padding:22px 10px;background:none;border:none;box-shadow:none;
+  border-radius:0;text-align:center;backdrop-filter:none;cursor:pointer}
+.node::before{content:'';position:absolute;inset:-26px;border-radius:50%;z-index:-1;
+  background:radial-gradient(circle,rgba(46,230,111,.22),rgba(46,230,111,.08) 45%,rgba(46,230,111,0) 70%);
+  animation:nbreathe 3.6s ease-in-out infinite;animation-delay:var(--bd,0ms)}
+.node::after{content:'';position:absolute;inset:-32px;border-radius:50%;z-index:-1;opacity:0;
+  background:radial-gradient(circle,rgba(94,255,160,.36),rgba(94,255,160,.12) 48%,rgba(94,255,160,0) 72%);
+  transition:opacity .5s}
+@keyframes nbreathe{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1.06)}}
+.node .ico{width:auto;height:auto;margin:0 auto 8px;background:none;border:none;box-shadow:none;border-radius:0}
+.node .ico svg{width:22px;height:22px;stroke-width:1.5;filter:drop-shadow(0 0 8px rgba(94,255,160,.8))}
+.node .nm{font-size:14.5px;font-weight:700;letter-spacing:.02em;color:#fff;margin:0;
+  text-shadow:0 1px 4px rgba(0,0,0,.95),0 0 12px rgba(46,230,111,.55)}
+.node .st{font-size:11.5px;color:#bfe8cc;margin-top:4px;line-height:1.35;text-shadow:0 1px 6px rgba(0,0,0,.9)}
+.node .st.wait{color:#fcd9a0;text-shadow:0 1px 6px rgba(0,0,0,.9),0 0 8px rgba(252,217,160,.3)}
+.node .live{font-size:8.5px;font-weight:800;letter-spacing:.42em;color:var(--accent);margin-top:9px;
+  text-shadow:0 0 10px rgba(46,230,111,.75)}
+.node.widget .nm{font-size:13px}
+.node.widget .st{font-size:11px}
+.node.widget .ico svg{width:20px;height:20px}
+/* flare + lit: brighter glow, no box anywhere */
+.node.flare .ico,.node.lit .ico{background:none;border:none;box-shadow:none}
+.node.flare .ico svg,.node.lit .ico svg{filter:drop-shadow(0 0 16px rgba(94,255,160,1))}
+.node.flare::after{opacity:1;transition:opacity .15s ease-out}
+.node.lit::after{opacity:.85}
+.node.flare .nm,.node.lit .nm{color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.95),0 0 16px rgba(94,255,160,.9)}
+body.reduced .node::before{animation:none}
+
+/* family mode: the nodes themselves cross to blue (glow, glyph, LIVE, text) */
+body.familyMode .node::before{background:radial-gradient(circle,rgba(94,200,255,.22),rgba(94,200,255,.08) 45%,rgba(94,200,255,0) 70%)}
+body.familyMode .node::after{background:radial-gradient(circle,rgba(160,220,255,.36),rgba(160,220,255,.12) 48%,rgba(160,220,255,0) 72%)}
+body.familyMode .node .ico svg{filter:drop-shadow(0 0 8px rgba(140,210,255,.8))}
+body.familyMode .node .nm{text-shadow:0 1px 4px rgba(0,0,0,.95),0 0 12px rgba(94,200,255,.6)}
+body.familyMode .node .st{color:#cfe6f7}
+body.familyMode .node .st.wait{color:#fcd9a0}
+body.familyMode .node .live{color:#9fd8ff;text-shadow:0 0 10px rgba(94,200,255,.75)}
+body.familyMode .node.flare .ico svg,body.familyMode .node.lit .ico svg{filter:drop-shadow(0 0 16px rgba(160,220,255,1))}
+
+/* cockpit rails: live data in the four corners of the business beat */
+.rail{position:fixed;z-index:6;max-width:240px;font-size:12px;color:#cfeeda;opacity:0;
+  transition:opacity .5s;pointer-events:none}
+#railTL{top:64px;left:28px;text-align:left}
+#railTR{top:64px;right:28px;text-align:right}
+#railBL{bottom:104px;left:28px;text-align:left}
+#railBR{bottom:104px;right:28px;text-align:right}
+.rail .rt{font-size:9.5px;font-weight:800;letter-spacing:.3em;text-transform:uppercase;color:var(--dim);
+  margin:16px 0 7px}
+.rail .rt:first-child{margin-top:0}
+.rail .rt .rmeta{color:#fcd9a0;margin-left:10px;letter-spacing:.14em;text-shadow:0 0 8px rgba(252,217,160,.3)}
+.rail .rr{padding:2.5px 0;line-height:1.4;text-shadow:0 1px 6px rgba(0,0,0,.9)}
+.rail .rr.warn{color:#fcd9a0}
+.rail .rr.ok{color:#9fe3b6;font-size:11px}
+.rail .rr.big{font-size:24px;font-weight:600;color:#fff;text-shadow:0 0 14px rgba(46,230,111,.5)}
+.rail.morphing{opacity:.12!important;transition:opacity .2s ease-in}
+body.familyMode .rail .rr.big{text-shadow:0 0 14px rgba(94,200,255,.5)}
+body.familyMode .rail .rr.ok{color:#a8dcff}
+#cockCap{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:8;
+  font-size:9px;font-weight:800;letter-spacing:.46em;color:var(--dim);opacity:0;transition:opacity .5s}
+
+/* the orb JUMPS: springy overshoot when it rises to the top */
+.orb{transition:transform .6s cubic-bezier(.3,1.4,.45,1),top .65s cubic-bezier(.3,1.4,.45,1),left .55s cubic-bezier(.55,0,.3,1),filter .4s}
+#orbTag{position:fixed;left:50%;top:calc(17vh + 88px);transform:translateX(-50%);z-index:7;
+  font-size:11px;font-weight:800;letter-spacing:.52em;text-indent:.52em;color:#d9ffe8;
+  text-shadow:0 0 12px rgba(46,230,111,.6);opacity:0;transition:opacity .4s}
+body.nodeFocus #orbTag{opacity:1}
+
+/* when a node page or the ask owns the screen, the ring and rails clear out */
+body.nodeFocus .node,body.flowMode .node{opacity:0!important;pointer-events:none!important}
+body.nodeFocus .rail,body.flowMode .rail{opacity:0!important}
+body.nodeFocus #modeTog,body.flowMode #modeTog,body.nodeFocus #cockCap,body.flowMode #cockCap{opacity:0!important;pointer-events:none!important}
+
+/* the in-node page: app-true, no card box. Copy under the risen orb. */
+#nodePage{position:fixed;inset:0;z-index:7;opacity:0;pointer-events:none}
+#nodePage .npc{position:absolute;left:50%;top:32vh;transform:translateX(-50%);width:min(640px,88vw);text-align:center}
+#nodePage .kick{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--accent);
+  text-shadow:0 0 12px rgba(46,230,111,.6);margin-bottom:14px}
+#nodePage h3{font-family:'Raleway',sans-serif;font-weight:200;font-size:clamp(26px,4vw,42px);color:#fff;
+  margin:0 0 12px;line-height:1.1;text-shadow:0 2px 26px rgba(0,0,0,.95)}
+#nodePage .npst{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#9fe3b6;
+  text-shadow:0 0 10px rgba(46,230,111,.4);margin-bottom:10px}
+#nodePage .npst.wait{color:#fcd9a0;text-shadow:0 0 10px rgba(252,217,160,.35)}
+#nodePage .npq{font-family:'Raleway',sans-serif;font-style:italic;font-weight:300;font-size:14.5px;
+  color:var(--dim);margin-bottom:22px}
+#nodePage .ncline{font-size:15px;line-height:1.5;color:#dff5e6;padding:6px 0;opacity:0;
+  text-shadow:0 0 8px rgba(46,230,111,.25)}
+#nodePage .npacts{display:flex;gap:38px;justify-content:center;margin-top:24px}
+#nodePage .npact{font-weight:600;font-size:12.5px;letter-spacing:.18em;text-transform:uppercase;color:#eafff4;
+  text-shadow:0 0 6px rgba(94,255,160,.85),0 0 16px rgba(46,230,111,.55)}
+#nodePage .rt{font-size:9.5px;font-weight:800;letter-spacing:.3em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+#nodePage .npl{position:absolute;left:36px;top:30vh;max-width:210px;text-align:left}
+#nodePage .npr{position:absolute;right:36px;top:30vh;max-width:230px;text-align:right}
+#nodePage .nps{padding:3px 0;font-size:12px;color:#cfeeda;text-shadow:0 1px 6px rgba(0,0,0,.9)}
+#nodePage .nps b{display:block;font-size:20px;font-weight:600;color:#fff;text-shadow:0 0 12px rgba(46,230,111,.45)}
+#nodePage .rr{padding:2.5px 0;font-size:12px;line-height:1.4;color:#cfeeda;text-shadow:0 1px 6px rgba(0,0,0,.9)}
+
+@media (max-width:700px){
+  .node,.node.widget{width:118px;padding:14px 6px}
+  .node .ico svg,.node.widget .ico svg{width:18px;height:18px}
+  .node .nm{font-size:11.5px}
+  .node.widget .nm{font-size:10.5px}
+  .node .st,.node.widget .st{font-size:9px}
+  .node .live{font-size:7px;margin-top:6px}
+  .rail,#nodePage .npl,#nodePage .npr{display:none}
+  #cockCap{bottom:18px;font-size:8px}
+  #nodePage .npc{top:30vh}
+  #orbTag{font-size:9.5px;top:calc(17vh + 68px)}
+}
+@media (prefers-reduced-motion: reduce){
+  .node::before{animation:none}
+}
