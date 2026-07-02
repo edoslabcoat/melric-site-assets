@@ -183,7 +183,10 @@ function applyStoryboard(){
   stage.style.transform=z>0?('scale('+(1+0.14*z).toFixed(4)+')'):'';
 
   var scrim=$('flowScrim');
-  if(scrim&&!flowOpen&&!contactOpen){ scrim.style.opacity=(0.85*z).toFixed(3); scrim.classList.remove('on'); }
+  if(scrim){
+    if(flowOpen||contactOpen){ scrim.style.opacity=''; }
+    else { scrim.style.opacity=(0.85*z).toFixed(3); scrim.classList.remove('on'); }
+  }
 
   if(P>0.975 && !flowOpen && !contactOpen) openFlow();
 }
@@ -225,16 +228,19 @@ function tick(){
   applyStoryboard(); watchFps(); requestAnimationFrame(tick);
 }
 
-/* ---- fps watchdog: two bad windows hide the corridor (low power) ---- */
-var _fpsN=0,_fpsT=performance.now(),_strikes=0,_fpsDone=REDUCED;
+/* ---- fps watchdog: sustained low fps hides the corridor (low power).
+   Warmup grace so load jank and background throttling never trip it. ---- */
+var _fpsN=0,_fpsT=performance.now(),_strikes=0,_fpsDone=REDUCED,_fpsStart=performance.now();
 function watchFps(){
   if(_fpsDone) return;
-  _fpsN++;
   var now=performance.now();
+  if(now-_fpsStart<8000){ _fpsN=0; _fpsT=now; return; }
+  if(document.hidden){ _fpsN=0; _fpsT=now; return; }
+  _fpsN++;
   if(now-_fpsT>=4000){
     var fps=_fpsN/((now-_fpsT)/1000);
     _fpsN=0; _fpsT=now;
-    if(fps<26){ _strikes++; if(_strikes>=2){ document.body.classList.add('low-power'); _fpsDone=true; } }
+    if(fps<22){ _strikes++; if(_strikes>=3){ document.body.classList.add('low-power'); _fpsDone=true; } }
     else _strikes=0;
   }
 }
