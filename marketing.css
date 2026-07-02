@@ -192,3 +192,80 @@ body.reduced .orb{background:radial-gradient(circle at 50% 45%,rgba(46,230,111,.
   .node.ghost .ico svg{width:20px;height:20px}
   .node.ghost .nm{font-size:9.5px}
 }
+
+/* ============================== v4 layer ==================================
+   Live widget nodes, the app's bottom Work|Family toggle with sliding knob,
+   Melric's caption bar, the approval-layer ask, family-blue tint. */
+
+/* widget nodes: small live app cards ringed around the orb */
+.node.widget{width:216px;padding:13px 15px;border-radius:12px;text-align:left;cursor:pointer;
+  background:rgba(6,14,9,.74);border:1px solid rgba(94,255,160,.28);
+  box-shadow:0 0 24px rgba(46,230,111,.2),inset 0 0 16px rgba(46,230,111,.07);
+  backdrop-filter:blur(4px)}
+.node.widget .wt{display:flex;gap:8px;align-items:center;font-size:10px;font-weight:800;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--accent);text-shadow:0 0 10px rgba(46,230,111,.5);margin-bottom:8px}
+.node.widget .wt svg{width:14px;height:14px;flex:0 0 auto}
+.node.widget .wl{font-size:13px;color:#dff5e6;padding:3px 0;text-shadow:0 1px 6px rgba(0,0,0,.9)}
+.node.widget .wl.big{font-size:19px;font-weight:600;color:#fff;text-shadow:0 0 12px rgba(46,230,111,.45)}
+.node.widget .wl.ok{color:#9fe3b6;font-size:12px}
+.node.widget .wl.done{color:var(--dim);text-decoration:line-through;text-decoration-color:rgba(94,255,160,.45)}
+.node.widget .wl.warn{color:#fcd9a0}
+.node.widget .wl .tag{font-size:9px;font-weight:800;letter-spacing:.16em;color:#fca5a5;margin-left:8px;
+  text-shadow:0 0 10px rgba(252,165,165,.6)}
+.node.widget.flare{border-color:rgba(94,255,160,.9);
+  box-shadow:0 0 44px rgba(94,255,160,.6),inset 0 0 22px rgba(46,230,111,.22);
+  transition:box-shadow .18s ease-out,border-color .18s ease-out}
+.node.widget.morphing{transform:translate(-50%,-50%) scale(.86)!important;opacity:.25!important;
+  transition:transform .18s ease-in,opacity .18s ease-in}
+
+/* the app's Work|Family toggle, bottom center (app: .modeToggle bottom 46px) */
+#modeTog{position:fixed;left:50%;bottom:46px;top:auto;transform:translateX(-50%);z-index:8;display:flex;gap:2px;
+  padding:3px;border-radius:999px;background:rgba(10,16,12,.55);border:1px solid #1c2a1f;
+  backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .4s,box-shadow .4s}
+#modeTog .mt-opt{position:relative;z-index:2;background:none;border:none;color:var(--dim);font-size:11px;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;padding:5px 16px;border-radius:999px;cursor:pointer;transition:color .3s;font-family:inherit}
+#modeTog .mt-opt.on{color:#7dffb0}
+#modeTog .mt-knob{position:absolute;z-index:1;top:3px;bottom:3px;border-radius:999px;background:rgba(46,230,111,.16);
+  box-shadow:0 0 14px rgba(46,230,111,.18);transition:left .45s cubic-bezier(.4,0,.2,1),width .45s cubic-bezier(.4,0,.2,1),background .45s,box-shadow .45s}
+body.familyMode #modeTog .mt-opt.on{color:#9fd8ff}
+body.familyMode #modeTog .mt-knob{background:rgba(94,200,255,.16);box-shadow:0 0 14px rgba(94,200,255,.18)}
+#modeTog.flipping{animation:togflash .85s ease-out}
+@keyframes togflash{
+  0%{box-shadow:0 0 0 rgba(94,255,160,0);transform:translateX(-50%) scale(1)}
+  30%{box-shadow:0 0 42px rgba(94,255,160,.85);transform:translateX(-50%) scale(1.16)}
+  100%{box-shadow:0 0 0 rgba(94,255,160,0);transform:translateX(-50%) scale(1)}
+}
+
+/* family mode: the app's blue-tinted world */
+body.familyMode .node.widget{border-color:rgba(140,210,255,.3);
+  box-shadow:0 0 24px rgba(94,200,255,.2),inset 0 0 16px rgba(94,200,255,.07)}
+body.familyMode .node.widget .wt{color:#9fd8ff;text-shadow:0 0 10px rgba(94,200,255,.5)}
+body.familyMode .node.widget .wl.big{text-shadow:0 0 12px rgba(94,200,255,.45)}
+body.familyMode .node.widget .wl.ok{color:#a8dcff}
+body.familyMode .node.widget.flare{border-color:rgba(160,220,255,.9);
+  box-shadow:0 0 44px rgba(94,200,255,.6),inset 0 0 22px rgba(94,200,255,.22)}
+
+/* Melric's caption bar (top center), the app's caption language */
+#melCap{position:fixed;top:66px;left:50%;transform:translateX(-50%) translateY(-6px);z-index:12;max-width:min(560px,80vw);
+  text-align:center;padding:10px 20px;border-radius:12px;background:rgba(10,16,12,.72);border:1px solid rgba(94,255,160,.22);
+  backdrop-filter:blur(6px);font-size:14px;color:#dff5e6;letter-spacing:.02em;
+  text-shadow:0 0 8px rgba(46,230,111,.3);opacity:0;pointer-events:none;transition:opacity .45s,transform .45s}
+#melCap.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#melCap::before{content:'MELRIC';display:block;font-size:9px;font-weight:800;letter-spacing:.34em;color:var(--accent);
+  text-shadow:0 0 10px rgba(46,230,111,.6);margin-bottom:4px}
+
+/* the ask as an approval layer: orb rises, content sits beneath it */
+#flow.approval{align-items:flex-start;padding-top:31vh}
+#flow.approval h3{font-size:clamp(24px,3.4vw,34px);font-weight:200;color:#eafff1}
+#flow.approval .kick{margin-bottom:14px}
+#flow.approval .opts{gap:34px;margin-top:6px}
+.orb{transition:transform .5s cubic-bezier(.4,0,.2,1),top .55s cubic-bezier(.55,0,.3,1),left .55s cubic-bezier(.55,0,.3,1),filter .4s}
+
+@media (max-width:700px){
+  .node.widget{width:168px;padding:10px 11px}
+  .node.widget .wl{font-size:11.5px}
+  .node.widget .wl.big{font-size:16px}
+  #modeTog{bottom:34px}
+  #melCap{top:58px;font-size:12.5px}
+  #flow.approval{padding-top:27vh}
+}
