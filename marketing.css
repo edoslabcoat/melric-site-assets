@@ -412,6 +412,7 @@ body.familyMode .node.widget{background:none;border:none;box-shadow:none;backdro
 @media (max-width:700px){
   #flow .opts{gap:34px}
   #flow .opt{padding:8px 10px}
+  #phaseCap{bottom:16%}
 }
 @media (prefers-reduced-motion: reduce){
   #flow .opt::before{animation:none}
