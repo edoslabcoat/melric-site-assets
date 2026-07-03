@@ -205,8 +205,9 @@ function layoutHub(){
   var W=stage.clientWidth,H=stage.clientHeight;
   var margin=(W<700||H<560)?120:185;
   var cx=W/2,cy=H/2,R=Math.max(margin,Math.min(W,H)/2-margin);
-  var R2=Math.max(230,Math.min(W,H)/2-140);
-  var svg=$('links'); if(svg) svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  /* phones: pull the widget ring in so side nodes stay on screen */
+  var R2=(W<700)?(Math.min(W,H)/2-72):Math.max(230,Math.min(W,H)/2-140);
+   var svg=$('links'); if(svg) svg.setAttribute('viewBox','0 0 '+W+' '+H);
   var ob=$('orb'); if(ob&&!flowOpen&&!orbIsUp){ ob.style.left=cx+'px'; ob.style.top=cy+'px'; }
   var gi=0;
   NODES.forEach(function(a,i){
