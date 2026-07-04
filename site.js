@@ -1165,14 +1165,19 @@ function openFlow(){
   var fl=$('flow'); fl.classList.add('on'); fl.classList.add('approval');
   /* ORB CLICKABLE DURING THE FLOW (v6 layering fix, 2026-07-04). DEFECT: #flow is a
      full-viewport overlay (inset:0, z-index:10, pointer-events auto) that sat ABOVE
-     the orb host (z-index 3) and ate every click, so clicking the risen orb to go home
-     did nothing while the qualifier was open. FIX: raise the orb host above the flow
-     overlay while flowOpen so its onclick=goHome receives the click. This is visually
-     safe because the risen orb sits at the very top (~17vh, the approval layer) and the
-     flow's own targets — the options, Back, and the native form — live from ~31vh down
-     (#flow.approval padding-top), so the orb never overlaps them; only the top orb
-     region becomes clickable-through. closeFlow() restores the orb's z-index. */
-  var orbEl=$('orb'); if(orbEl) orbEl.style.zIndex='12';
+     the orb host and ate every click, so clicking the risen orb to go home did nothing
+     while the qualifier was open. The orb (#orb) is a child of #stage, which is itself a
+     positioned z-index:1 stacking context, so simply raising #orb's z-index cannot lift
+     it above #flow (it only reorders within #stage). FIX: make the #flow OVERLAY pass
+     pointer events through (pointer-events:none) while keeping its content block
+     (#flowStep — the kick/question/options/Back/native form) interactive
+     (pointer-events:auto). The empty top region of #flow (above the flex-start content
+     at ~31vh) then lets clicks fall through to the risen orb (~17vh) beneath, whose
+     onclick=goHome fires; the options/Back/form still receive clicks because they live
+     inside #flowStep. flowScrim is already pointer-events:none, so nothing else blocks.
+     closeFlow() restores #flow's pointer-events. renderStep re-asserts #flowStep auto. */
+  fl.style.pointerEvents='none';
+  var fst=$('flowStep'); if(fst) fst.style.pointerEvents='auto';
   orbUp();                                    /* and the orb jumps */
   applyStoryboard();
   renderStep('q1');
@@ -1199,7 +1204,7 @@ function closeFlow(){
   document.body.classList.remove('flowMode');
   $('flowScrim').classList.remove('on');
   var fl=$('flow'); fl.classList.remove('on'); fl.classList.remove('approval');
-  var orbEl=$('orb'); if(orbEl) orbEl.style.zIndex='';   /* restore: drop the flow-layer orb raise */
+  fl.style.pointerEvents='';   /* restore: the overlay eats clicks again when hidden (harmless; it's display:none) */
   orbDown();
   applyStoryboard();
 }
@@ -1231,6 +1236,7 @@ function renderStep(key){
   html+='<div class="backline"><span class="glow dim" id="flowBackBtn">&lsaquo; Back</span>'
       + '<span class="glow" id="backOrb">Back to the orb <span class="arw">&rsaquo;</span></span></div>';
   step.innerHTML=html;
+  step.style.pointerEvents='auto';   /* the flow overlay is pointer-events:none while open (orb-clickable fix); keep the content block itself interactive so options/Back/form always receive clicks */
   if(s.capture) placeForm($('formSlot'));
   var fb=$('flowBackBtn'); if(fb) fb.onclick=flowBack;
   var bo=$('backOrb'); if(bo) bo.onclick=closeFlow;
