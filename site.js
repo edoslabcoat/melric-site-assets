@@ -1163,6 +1163,16 @@ function openFlow(){
   document.body.classList.add('flowMode');   /* the ring + rails clear out */
   $('flowScrim').classList.add('on');
   var fl=$('flow'); fl.classList.add('on'); fl.classList.add('approval');
+  /* ORB CLICKABLE DURING THE FLOW (v6 layering fix, 2026-07-04). DEFECT: #flow is a
+     full-viewport overlay (inset:0, z-index:10, pointer-events auto) that sat ABOVE
+     the orb host (z-index 3) and ate every click, so clicking the risen orb to go home
+     did nothing while the qualifier was open. FIX: raise the orb host above the flow
+     overlay while flowOpen so its onclick=goHome receives the click. This is visually
+     safe because the risen orb sits at the very top (~17vh, the approval layer) and the
+     flow's own targets — the options, Back, and the native form — live from ~31vh down
+     (#flow.approval padding-top), so the orb never overlaps them; only the top orb
+     region becomes clickable-through. closeFlow() restores the orb's z-index. */
+  var orbEl=$('orb'); if(orbEl) orbEl.style.zIndex='12';
   orbUp();                                    /* and the orb jumps */
   applyStoryboard();
   renderStep('q1');
@@ -1189,6 +1199,7 @@ function closeFlow(){
   document.body.classList.remove('flowMode');
   $('flowScrim').classList.remove('on');
   var fl=$('flow'); fl.classList.remove('on'); fl.classList.remove('approval');
+  var orbEl=$('orb'); if(orbEl) orbEl.style.zIndex='';   /* restore: drop the flow-layer orb raise */
   orbDown();
   applyStoryboard();
 }
@@ -1276,7 +1287,14 @@ var VOICE_BASE=(function(){
       for(var i=a.length-1;i>=0;i--){ if(/site\.js(\?|$)/.test(a[i].src)) return a[i]; } return null; })();
     if(s&&s.src) return s.src.replace(/site\.js(\?.*)?$/,'');   /* strip filename, keep dir + pin */
   }catch(e){}
-  return 'https://cdn.jsdelivr.net/gh/edoslabcoat/melric-site-assets@80bcf40/';
+  /* DEAD PATH (v6 cleanup 2026-07-04): the pin is derived from this script's own src
+     above, which always resolves for a normally-loaded <script src=…site.js>. This
+     fallback only fires if the src cannot be read at all. Rather than hardcode a pin
+     that goes stale on every deploy, return '' and let the voice layer no-op: every
+     VOICE manifest entry is null today (voicePlay early-returns on !file), so no request
+     is ever made; if a file is later added and this dead path somehow fires, the src is
+     relative and simply 404s silently (voicePlay catches it). No live pin to maintain. */
+  return '';
 })();
 /* beat index -> voice file (repo root, same pin pattern). ALL null for now: shipping
    silent is safe. Fill an entry (e.g. 2:'voice-cmo.mp3') when the audio lands. */
