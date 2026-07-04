@@ -286,57 +286,148 @@ function derezHeadline(){
 var P=0, PT=0, lineGrow=0, elecOn=0, flowOpen=false, contactOpen=false, familyOn=false;
 var sendPulse=null, _cardEntered=-1, _focusOn=false;
 
-/* ---- gesture feel (v6): spring-chased P + rubber-band + beat magnetism.
-   PT is the TARGET the gesture wants; P chases it with a critically-damped
-   spring (k=150) so scrolling mid-beat moves the beat mid-flight and nothing
-   waits for you. Pv is the spring velocity, also the "drive" that sprints the
-   tunnel. Reduced-motion snaps P=PT (no spring) so nothing animates. ---- */
-var Pv=0;                                   /* spring velocity */
-var lastInteract=0;                         /* ms of the last gesture (for magnetism) */
-var SPRING_K=150;                           /* stiffness (Eric-approved feel) */
-var SPRING_D=2*Math.sqrt(SPRING_K);         /* critical damping (~24.5) */
+/* ============================================================================
+   STEP MODEL (v6, Eric-approved 2026-07-04). Scroll is an EVENT, not a scrub.
+   One deliberate gesture = advance to the next beat: P TWEENS from the current
+   rest through the existing timeline to the next rest (the transition plays like
+   a short film cut). Scrolls during playback do NOTHING (swallowed). On arrival
+   the beat SITS for a dwell before input arms again. Scroll up = previous beat,
+   same rules. The renderer, choreography and beats are UNCHANGED; only the input
+   layer that produces P is swapped, plus per-beat arrival cascades.
+   PT is unified with P now (the user never chases a target; P is fully owned by
+   the tween). Pv (the old spring velocity) is retired; the tunnel drive is read
+   from the tween's own velocity dP/dt. ============================================================================ */
 
-/* ---- NEVER MOVE BACKWARD (v6 WAVE A.2, Eric punch list item 1). "Really the
-   main thing." The board must only ever settle FORWARD along the direction the
-   user last drove. Two mechanisms:
-   (1) DIRECTIONAL MAGNETISM (in tick): when input goes quiet, only rests at or
-       AHEAD of P in lastDir count as candidates (a tiny epsilon behind catches
-       you're-basically-there); pick the nearest ahead; if none, DO NOT MOVE.
-   (2) REVERSE BUFFER: input opposite to lastDir is accumulated in reverseAccum
-       instead of applied. Direction only flips once the accumulated opposite
-       intent clears a deliberate threshold (~2 wheel clicks / ~40px drag). Keys
-       are deliberate, so an opposite key flips immediately. ---- */
-var lastDir=1;                              /* sign of the most recent applied user input (+1 fwd, -1 back) */
-var reverseAccum=0;                         /* buffered opposite-direction intent (same units as PT delta) */
-var lastInputT=0;                           /* ms of the most recent raw input event (for reverse-buffer reset) */
-var WHEEL_STEP=0.13;                        /* a typical wheel-click normalized PT delta (~100px x 0.0013; the 140px cap is the max) */
-var REVERSE_WHEEL=2*WHEEL_STEP;             /* ~2 wheel clicks of opposite intent flips direction */
-var REVERSE_TOUCH_PX=40;                    /* ~40px deliberate opposite drag flips direction */
-var REVERSE_QUIET=600;                      /* ms of quiet resets the reverse buffer */
-var MAG_EPS=0.004;                          /* rests this far behind P still count as candidates (basically-there) */
+/* --- BEATS: the rest points, unchanged, still derived from BEAT_RESTS below.
+   beatIdx is the index into BEAT_RESTS the board is resting on (or the index it
+   is tweening TOWARD while tweenActive). --- */
+var beatIdx=0;                              /* current / destination rest index */
+var tweenActive=false;                      /* true while a transition is playing */
+var tweenStart=0, tweenFrom=0, tweenTo=0, tweenDur=1; /* ms + P endpoints of the active tween */
+var arrivalTime=0;                          /* ms the current beat was arrived at (dwell clock start) */
+var _dPdt=0;                                /* P velocity from the tween, for corridor drive */
 
-/* Route a raw input delta through the reverse buffer, then set the target.
-   dRaw is the desired change to PT; thresh is how much opposite intent this input
-   type needs to accumulate before it may flip direction (keys pass thresh=0 =
-   deliberate). Returns nothing; applies via setTarget only when allowed. */
-function driveBy(dRaw,thresh){
-  var now=performance.now();
-  if(now-lastInputT>REVERSE_QUIET) reverseAccum=0;   /* stale opposite intent decays away */
-  lastInputT=now;
-  var dir=dRaw<0?-1:1;
-  if(dir===lastDir || dRaw===0){
-    reverseAccum=0;                                  /* continuing forward clears any buffered reversal */
-    setTarget(PT+dRaw);
+/* --- ARM / SWALLOW: after a step fires we swallow ALL input until the tween is
+   complete AND a dwell has passed AND the input channel has been quiet long
+   enough that trackpad inertia tails cannot double-fire. --- */
+var DWELL_MS=500;                           /* the beat SITS at least this long after the tween ends before arming */
+var WHEEL_SILENCE_MS=220;                   /* wheel must be quiet this long post-dwell so inertia tails cannot double-fire */
+var lastWheelT=0;                           /* ms of the most recent raw wheel event (for the silence gate) */
+
+/* --- GESTURE THRESHOLDS: one deliberate notch/flick fires exactly one step. --- */
+var WHEEL_FIRE=60;                          /* |accumulated normalized deltaY| to fire one wheel step */
+var WHEEL_ACCUM_RESET=140;                  /* ms of wheel silence that zeroes the accumulator (new gesture) */
+var TOUCH_FIRE_PX=50;                       /* vertical swipe px (while armed) to fire one touch step */
+var wheelAccum=0;                           /* signed normalized deltaY accumulator toward WHEEL_FIRE */
+
+/* --- DURATIONS keyed by DESTINATION beat index, so perceived pacing is TIME and
+   identical per transition in either direction (fixes "first beat long, rest
+   cramped"). Beat order (BEAT_RESTS): 0 hero, 1 ring, 2 CMO, 3 CFO, 4 COO,
+   5 cockpit, 6 family, 7 ask, 8 final. Reverse uses the same table keyed by the
+   HIGHER of the two endpoints (the transition between beats N-1 and N always
+   takes DUR[N], forward or back). --- */
+var DUR_HERO_RING=1500;                     /* hero -> ring */
+var DUR_RING_CMO=1100;                      /* ring -> CMO */
+var DUR_CARD=1000;                          /* card -> card (CMO<->CFO<->COO) */
+var DUR_COO_COCKPIT=1500;                   /* COO -> cockpit (dissolve + ghost ring-in needs room) */
+var DUR_COCKPIT_FAMILY=1000;               /* cockpit -> family */
+var DUR_FAMILY_ASK=1200;                    /* family -> ask */
+/* index into this table is the HIGHER beat of the pair (destination when going
+   forward). Entry 0 is unused (no transition ends at the hero from below). */
+var DURATIONS=[0, DUR_HERO_RING, DUR_RING_CMO, DUR_CARD, DUR_CARD, DUR_COO_COCKPIT, DUR_COCKPIT_FAMILY, DUR_FAMILY_ASK, 0];
+
+/* --- ARRIVAL CLOCK: when a tween completes at a beat that has a copy cascade
+   (card pages, cockpit rails, family), arrivalTime starts a clock the reveal
+   drivers read so lines/rails cascade in one at a time on a TIME basis, not a
+   P-band. Reverse entry replays cleanly because the clock restarts on every
+   arrival. --- */
+var LINE_STAGGER_MS=320;                    /* each copy line arrives this long after the previous */
+var LINE_FADE_MS=360;                       /* a single line's blur-to-clear fade duration */
+var RAIL_LEAD_MS=360;                       /* rails/count-ups begin this long after the last copy line */
+var REDUCED_ARRIVAL_MS=120;                 /* reduced-motion: whole cascade compressed to <=120ms */
+
+/* is the input channel armed for a fresh step? (not tweening, dwell elapsed,
+   wheel silent, flow/contact not owning input). `nowMs` is performance.now(). */
+function stepArmed(nowMs){
+  if(tweenActive||flowOpen||contactOpen) return false;
+  if(nowMs-arrivalTime < DWELL_MS) return false;
+  return true;
+}
+/* the duration for the transition between beats a and b (order-independent). */
+function stepDuration(a,b){ var hi=Math.max(a,b); return DURATIONS[hi]||DUR_CARD; }
+
+/* fire exactly one step in dir (+1 next, -1 prev) if a move is possible.
+   Beat 0 back-step and last-beat forward-step are no-ops. Stepping FORWARD off
+   the ask beat opens the qualifier flow instead of tweening past it. */
+function step(dir){
+  if(tweenActive||flowOpen||contactOpen) return;
+  var askIdx=BEAT_RESTS.length-2;           /* the ask rest (0.955) is second-to-last */
+  /* forward off the ask beat -> open the flow (do not tween into the final rest) */
+  if(dir>0 && beatIdx>=askIdx){ if(beatIdx===askIdx){ openFlow(); } return; }
+  var to=beatIdx+dir;
+  if(to<0 || to>=BEAT_RESTS.length) return; /* edges: no-op */
+  var from=beatIdx;
+  beatIdx=to;
+  if(REDUCED){
+    P=PT=BEAT_RESTS[to]; _dPdt=0;
+    arrivalTime=performance.now();          /* reduced arrival cascade is near-instant, clock still starts */
     return;
   }
-  /* opposite to lastDir: buffer it, do not move yet */
-  reverseAccum+=Math.abs(dRaw);
-  if(reverseAccum>=thresh){
-    lastDir=dir; reverseAccum=0;
-    setTarget(PT+dRaw);                              /* the accumulated intent now applies */
-  }
+  tweenActive=true;
+  tweenFrom=P; tweenTo=BEAT_RESTS[to];
+  tweenStart=performance.now();
+  tweenDur=stepDuration(from,to);
 }
-function setTarget(v){ PT=clamp(v,-0.06,1.06); lastInteract=performance.now(); } /* allow rubber-band overshoot at the ends */
+
+/* easeInOutQuart: fast middle, soft ends -> the filmic feel of a quick playing
+   video. t in 0..1. */
+function easeInOutQuart(t){
+  return t<0.5 ? 8*t*t*t*t : 1-Math.pow(-2*t+2,4)/2;
+}
+
+/* drive the active tween one frame. Sets P along the eased path and _dPdt (the
+   instantaneous |dP/dt| feel, 0..1-ish) so the corridor sprints mid-transition
+   and calms on arrival. On completion, latch the arrival clock. `nowMs` is
+   performance.now(); `dtS` is the frame delta in seconds (already clamped). */
+function driveTween(nowMs,dtS){
+  var prevP=P;
+  var raw=(nowMs-tweenStart)/tweenDur;
+  if(raw>=1){
+    P=PT=tweenTo;
+    tweenActive=false;
+    arrivalTime=nowMs;                      /* dwell + arrival cascade clock start */
+    _dPdt=0;
+    return;
+  }
+  var t=raw<0?0:raw;
+  P=PT=tweenFrom+(tweenTo-tweenFrom)*easeInOutQuart(t);
+  /* map frame-over-frame |dP| to a 0..1 drive with the existing scale feel
+     (old drive = min(1, |Pv|*2.5); |dP/dt| here is comparable in magnitude). */
+  if(dtS>0){ _dPdt=Math.abs(P-prevP)/dtS; }
+}
+
+/* ---- ARRIVAL CLOCK readers. Each returns 0..1 for one revealed element, from
+   ms elapsed since arrivalTime. While a tween is still playing (arrival not yet
+   reached) they return 0 so the renderers fall back to their P-based value via
+   max(). Reduced-motion compresses the whole cascade into REDUCED_ARRIVAL_MS. ---- */
+/* progress of copy line k (0-based): each line arrives LINE_STAGGER_MS after the
+   previous and fades over LINE_FADE_MS. */
+function arrivalLine(k){
+  if(tweenActive) return 0;
+  var el=performance.now()-arrivalTime;
+  if(REDUCED){ return el>=REDUCED_ARRIVAL_MS?1:clamp(el/REDUCED_ARRIVAL_MS,0,1); }
+  var start=k*LINE_STAGGER_MS;
+  return clamp((el-start)/LINE_FADE_MS,0,1);
+}
+/* progress of the rails / count-ups, which begin RAIL_LEAD_MS after the LAST of
+   `lineCount` copy lines has arrived. */
+function arrivalRail(lineCount){
+  if(tweenActive) return 0;
+  var el=performance.now()-arrivalTime;
+  if(REDUCED){ return el>=REDUCED_ARRIVAL_MS?1:clamp(el/REDUCED_ARRIVAL_MS,0,1); }
+  var start=lineCount*LINE_STAGGER_MS+RAIL_LEAD_MS;
+  return clamp((el-start)/LINE_FADE_MS,0,1);
+}
 
 /* storyboard bands
    PACING REBALANCE (v6 WAVE A.2, Eric staging punch list item 2): the hero band
@@ -350,6 +441,24 @@ var CARD_BANDS=[ [0.25,0.37], [0.37,0.49], [0.49,0.61] ];
 var DISSOLVE=[0.61,0.66];   /* C-suite fades out */
 var GHOST_START=0.65;       /* widgets + rails ring in staggered */
 var FLIP=0.83;              /* the toggle flips to Family */
+
+/* ---- ORB-UP CARD ZONE (v6 orb-jumping fix, 2026-07-04). DEFECT: focus was keyed
+   to a per-band cardState().vis>0.30, so at every band BOUNDARY (0.37 CMO->CFO,
+   0.49 CFO->COO) vis dipped through zero, focus dropped, the orb started DOWN, then
+   snapped back UP entering the next band (measured 33px down / 39px up in ~0.4s) and
+   the connector lines re-grew toward center over empty space. FIX: treat the whole
+   run of node pages as ONE zone. While P is anywhere in the zone (bands AND the gaps
+   between them), the orb stays parked at the top and the ring/lines stay suppressed;
+   the orb only rises on entering the zone and only descends on leaving it. Zone edges
+   are derived from CARD_BANDS (never hardcoded duplicates) with a small hysteresis
+   margin so the descent trigger can never fall inside a between-cards gap in either
+   scroll direction. ZONE_IN < first band start; ZONE_OUT = last band end (the dissolve
+   begins there and owns the exit). */
+var ZONE_MARGIN=0.02;                              /* hysteresis below the first band */
+var ZONE_IN=CARD_BANDS[0][0]-ZONE_MARGIN;          /* enter the orb-up zone (0.23) */
+var ZONE_OUT=CARD_BANDS[CARD_BANDS.length-1][1];   /* leave it as the dissolve starts (0.61) */
+/* true while P sits anywhere across all three node pages and the gaps between them. */
+function inCardZone(){ return P>=ZONE_IN && P<=ZONE_OUT; }
 
 /* beat resting points (v6 magnetism): the readable CENTER of each existing v5
    beat, derived from the bands above. When input goes quiet, PT eases onto the
@@ -497,12 +606,17 @@ function applyStoryboard(){
   var flipT=smooth(FLIP,FLIP+0.02,P);
   setFamily(flipT>0.5);
 
-  /* the moment a node page (or the ask) owns the screen, the ring clears out
-     and the orb jumps up. Nothing else stays on stage with the orb. */
-  var focus=!!(cs&&cs.vis>0.30)&&!flowOpen;
-  if(focus){
-    var tg=$('orbTag'); if(tg&&NODES[cs.i]) tg.textContent=NODES[cs.i].name;
-  }
+  /* ORB-UP ZONE (v6 orb-jumping fix): focus is now the ZONE predicate, not a per-band
+     cs.vis test. While P sits anywhere in the card zone (all three node pages AND the
+     gaps between them), focus stays true, so the orb rises ONCE on entering the zone
+     and holds at the top across every page and gap; it descends only on leaving the
+     zone. This kills the down/up bounce at each band boundary and keeps the ring/lines
+     suppressed the whole way (no lines converging on empty center in a gap). */
+  var focus=inCardZone()&&!flowOpen;
+  /* label swap: while inside a band update the letterspaced tag to the current node;
+     in a between-cards gap cs is null, so we HOLD the last label (no flicker to blank)
+     until the next band takes over. The orb is stationary, so the swap reads clean. */
+  if(cs&&NODES[cs.i]){ var tg=$('orbTag'); if(tg) tg.textContent=NODES[cs.i].name; }
   if(focus!==_focusOn){
     _focusOn=focus;
     document.body.classList.toggle('nodeFocus',focus);
@@ -514,7 +628,23 @@ function applyStoryboard(){
   var togOp=(flowOpen||contactOpen)?0:smooth(GHOST_START+0.02,GHOST_START+0.06,P);
   if(tog) tog.style.opacity=togOp.toFixed(3);
   var railOp=(flowOpen||contactOpen)?0:smooth(GHOST_START+0.02,GHOST_START+0.08,P);
-  ['railTL','railTR','railBL','railBR'].forEach(function(id){ var r=$(id); if(r) r.style.opacity=railOp.toFixed(3); });
+  /* COCKPIT / FAMILY ARRIVAL CASCADE (step model): on arrival at the cockpit beat
+     (idx 5) or the family beat (idx 6) the four corner rails type on staggered on
+     the arrival clock (rail swap cascade). max(P-based, arrival) so a fast scrub
+     still shows them and a reverse entry replays the cascade cleanly. */
+  var railCascade=!(flowOpen||contactOpen) && !tweenActive && (beatIdx===5||beatIdx===6);
+  ['railTL','railTR','railBL','railBR'].forEach(function(id,ci){
+    var r=$(id); if(!r) return;
+    var op=railOp;
+    if(railCascade){
+      /* stagger corners by LINE_STAGGER_MS so the four rails cascade, not pop */
+      var el=performance.now()-arrivalTime;
+      var span=REDUCED?REDUCED_ARRIVAL_MS:LINE_FADE_MS;
+      var start=REDUCED?0:ci*LINE_STAGGER_MS;
+      op=Math.max(railOp, clamp((el-start)/span,0,1));
+    }
+    r.style.opacity=op.toFixed(3);
+  });
   var cc=$('cockCap'); if(cc) cc.style.opacity=togOp.toFixed(3);
 
   var gi=0;
@@ -552,11 +682,12 @@ function applyStoryboard(){
   lineGrow=smooth(0.07,0.15,P);
   elecOn=(REDUCED||hideRing)?0:smooth(0.12,0.20,P)*(cs?(1-0.55*cs.vis):1);
 
-  /* v6 tunnel dolly: sprint while scrolling (drive = spring velocity), settle to
-     a barely-there drift when parked; dolly by scroll DEPTH (P). Reduced-motion
-     never drives (constant idle corridor stays). */
+  /* v6 tunnel dolly (STEP MODEL): the tunnel SPRINTS mid-transition and calms on
+     arrival. drive = the tween's own |dP/dt| mapped to 0..1 with the existing
+     scale feel; at rest _dPdt is 0 so the corridor settles to its idle drift.
+     Dolly by scroll DEPTH (P). Reduced-motion never drives (constant idle). */
   if(!REDUCED && window.corridorSetDrive){
-    var drive=Math.min(1,Math.abs(Pv)*2.5);
+    var drive=Math.min(1,Math.abs(_dPdt)*2.5);
     window.corridorSetDrive(drive, clamp(P,0,1));
   }
 
@@ -623,97 +754,111 @@ function renderPage(cs){
   pg.style.opacity=pv.toFixed(3);
   var npc=pg.querySelector('.npc');
   if(npc) npc.style.transform='translateX(-50%) translateY('+((1-pv)*26).toFixed(1)+'px)';
+  /* ARRIVAL CASCADE (step model): on arrival at a card beat the copy lines
+     cascade in ONE AT A TIME on the arrival clock (each ~LINE_STAGGER_MS after
+     the previous, blur-to-clear via CSS on .ncline opacity). Rebind from the old
+     P-band value to max(arrival clock, P-based) so nothing is ever missed and a
+     reverse entry replays the cascade cleanly (arrivalTime restarts each arrival). */
   var lines=pg.querySelectorAll('.ncline');
   for(var k=0;k<lines.length;k++){
     var th=0.32+k*0.10;
-    lines[k].style.opacity=smooth(th,th+0.08,cs.t).toFixed(3);
+    var pBased=smooth(th,th+0.08,cs.t);
+    var op=Math.max(pBased, arrivalLine(k));
+    lines[k].style.opacity=op.toFixed(3);
   }
+  /* the data rails type on AFTER the copy lines: rail arrival begins once the
+     last line has landed. Same max(clock, P-based) rebind: the P-based floor is
+     the page's own reveal pv so a fast scrub still shows them. */
+  var railProg=Math.max(pv, arrivalRail(lines.length));
+  var npl=pg.querySelector('.npl'), npr=pg.querySelector('.npr');
+  if(npl) npl.style.opacity=railProg.toFixed(3);
+  if(npr) npr.style.opacity=railProg.toFixed(3);
 }
 
-/* ---- gesture driver (v6). The page itself never scrolls. Wheel deltas are
-   normalized across deltaMode; touch is 1:1 scrub + momentum fling; keys step
-   ~11 presses across the whole board (the old 0.032 step felt dead). All input
-   sets the TARGET PT; the spring in tick() chases it, so input works mid-flight. ---- */
+/* ---- STEP-MODEL input layer (v6, Eric 2026-07-04). The page never scrolls. One
+   deliberate gesture = one step (fire step(+/-1)); everything else is swallowed.
+   The old scrub driveBy/spring/magnetism/reverse-buffer machinery is REMOVED. ---- */
+
+/* WHEEL: accumulate normalized deltaY; when |accum| crosses WHEEL_FIRE and input
+   is armed, fire exactly ONE step in that direction, then let the swallow rules
+   (tween + dwell + wheel-silence) keep every following wheel event inert until we
+   re-arm. A gap of WHEEL_ACCUM_RESET ms between events starts a fresh accumulator
+   so a slow deliberate notch and a fast flick both fire once, never twice. */
 window.addEventListener('wheel',function(e){
   if(flowOpen||contactOpen) return; e.preventDefault();
+  var now=performance.now();
+  var sinceLast=now-lastWheelT;                        /* gap since the previous wheel event */
+  if(sinceLast>WHEEL_ACCUM_RESET) wheelAccum=0;        /* new gesture: fresh accumulator */
+  var quietBefore=sinceLast>=WHEEL_SILENCE_MS;         /* the wheel had gone silent before this event */
+  lastWheelT=now;
+  if(!stepArmed(now)) return;                          /* swallowed: tweening / dwell / not armed */
+  /* WHEEL-SILENCE gate: a fresh step may only begin from a wheel that had gone
+     quiet for WHEEL_SILENCE_MS. While a trackpad inertia tail keeps firing events
+     (gaps < WHEEL_SILENCE_MS), quietBefore stays false, so the tail can never
+     start a second gesture even after the dwell elapses. Once accumulation has
+     legitimately begun (accum non-zero this gesture), keep feeding it. */
+  if(wheelAccum===0 && !quietBefore) return;           /* tail event: do not start a new gesture */
   var d=e.deltaY;
   if(e.deltaMode===1) d*=16;         /* lines -> px */
   else if(e.deltaMode===2) d*=400;   /* pages -> px */
   d=clamp(d,-140,140);               /* tame one violent trackpad kick */
-  driveBy(d*0.0013,REVERSE_WHEEL);   /* wheel gain +1.7x so a trackpad flick exits the hero as fast as keys; reverse buffer: opposite wheel needs ~2 clicks to flip */
+  wheelAccum+=d;
+  if(Math.abs(wheelAccum)>=WHEEL_FIRE){
+    var dir=wheelAccum<0?-1:1;
+    wheelAccum=0;
+    step(dir);                       /* exactly one step; further wheel is swallowed until re-armed */
+  }
 },{passive:false});
 
-/* keys: one press moves ~one card band. Card-zone rests are ~0.12 apart
-   (RING_REST 0.19 -> 0.31 -> 0.43 -> 0.55); KEY_STEP 0.10 lands just short of the
-   next rest and the strengthened forward magnetism catch pulls onto it, so a single
-   press reliably visits successive rests in order without skipping a whole band. */
-var KEY_STEP=0.10;
+/* KEYS: ArrowDown/PageDown/Space = next; ArrowUp/PageUp = prev; Home/End =
+   first/last. Armed-gated the same way (one press = one step when armed). */
 window.addEventListener('keydown',function(e){
   if(e.key==='Escape'){ if(contactOpen) closeContact(); else if(flowOpen) closeFlow(); return; }
   if(flowOpen||contactOpen) return;
-  /* keys are deliberate: an opposite key flips direction immediately (thresh 0) */
-  if(e.key==='ArrowDown'||e.key==='PageDown'||e.key===' '||e.key==='Spacebar'){ e.preventDefault(); driveBy(KEY_STEP,0); }
-  else if(e.key==='ArrowUp'||e.key==='PageUp'){ e.preventDefault(); driveBy(-KEY_STEP,0); }
-  else if(e.key==='Home'){ e.preventDefault(); lastDir=-1; reverseAccum=0; setTarget(0); }
-  else if(e.key==='End'){ e.preventDefault(); lastDir=1; reverseAccum=0; setTarget(1); }
+  var now=performance.now();
+  if(e.key==='ArrowDown'||e.key==='PageDown'||e.key===' '||e.key==='Spacebar'){ e.preventDefault(); if(stepArmed(now)) step(1); }
+  else if(e.key==='ArrowUp'||e.key==='PageUp'){ e.preventDefault(); if(stepArmed(now)) step(-1); }
+  else if(e.key==='Home'){ e.preventDefault(); if(stepArmed(now)) stepTo(0); }
+  else if(e.key==='End'){ e.preventDefault(); if(stepArmed(now)) stepTo(BEAT_RESTS.length-2); } /* End -> the ask beat (final rest opens the flow) */
 });
 
-/* touch: 1:1 scrub while dragging + momentum fling on release + rubber-band */
-var _tActive=false,_tStartY=0,_tStartP=0,_tLastY=0,_tLastT=0,_tVel=0;
+/* TOUCH: a swipe of > TOUCH_FIRE_PX vertical while armed fires one step (direction
+   by sign), same swallow rules. No 1:1 scrub, no fling: it is a discrete gesture. */
+var _tActive=false,_tStartY=0,_tFired=false;
 window.addEventListener('touchstart',function(e){
   if(flowOpen||contactOpen) return;
-  _tActive=true; _tStartY=_tLastY=e.touches[0].clientY; _tStartP=PT; _tLastT=performance.now(); _tVel=0;
+  _tActive=true; _tStartY=e.touches[0].clientY; _tFired=false;
 },{passive:true});
 window.addEventListener('touchmove',function(e){
   if(flowOpen||contactOpen||!_tActive) return; e.preventDefault();
-  var y=e.touches[0].clientY, now=performance.now();
-  var screen=window.innerHeight*1.15;              /* ~one screen height covers the board */
-  /* feed the incremental drag delta through the reverse buffer (deliberate ~40px
-     opposite drag flips direction), so touch honours NEVER MOVE BACKWARD too */
-  var dInc=(_tLastY-y)/screen;
-  driveBy(dInc,REVERSE_TOUCH_PX/screen);
-  var dt=Math.max(1,now-_tLastT); _tVel=(_tLastY-y)/dt; _tLastY=y; _tLastT=now;
+  if(_tFired) return;                                  /* one step per swipe */
+  var dy=_tStartY-e.touches[0].clientY;                /* +down (next), -up (prev) */
+  if(Math.abs(dy)>=TOUCH_FIRE_PX){
+    if(stepArmed(performance.now())){ _tFired=true; step(dy<0?-1:1); }
+    else { _tFired=true; }                             /* swallowed, but do not re-test this swipe */
+  }
 },{passive:false});
-window.addEventListener('touchend',function(){
-  if(!_tActive) return; _tActive=false;
-  var fling=clamp(_tVel,-3,3)*0.42;                /* carry velocity into the target */
-  driveBy(fling,REVERSE_TOUCH_PX/(window.innerHeight*1.15));  /* fling honours direction lock */
-},{passive:true});
+window.addEventListener('touchend',function(){ _tActive=false; },{passive:true});
 
-/* spring-chased P (critically damped) + rubber-band at the ends + beat magnetism.
-   Reduced-motion snaps (no spring, no magnetism) so nothing moves on its own. */
+/* jump straight to a beat index (Home/End), respecting REDUCED and the tween. */
+function stepTo(idx){
+  if(tweenActive||flowOpen||contactOpen) return;
+  idx=Math.max(0,Math.min(BEAT_RESTS.length-1,idx));
+  if(idx===beatIdx) return;
+  var from=beatIdx; beatIdx=idx;
+  if(REDUCED){ P=PT=BEAT_RESTS[idx]; _dPdt=0; arrivalTime=performance.now(); return; }
+  tweenActive=true; tweenFrom=P; tweenTo=BEAT_RESTS[idx];
+  tweenStart=performance.now(); tweenDur=stepDuration(from,idx);
+}
+
+/* ---- tick (STEP MODEL): P is owned entirely by the active tween; at rest P is
+   pinned to the current beat's rest. No spring, no magnetism, no rubber-band.
+   Reduced-motion never tweens (step()/stepTo() snap P directly). ---- */
 function tick(){
   var now=performance.now();
   var dt=(tick._last==null)?0.016:Math.min(0.05,(now-tick._last)/1000); tick._last=now;
-  if(REDUCED){ P=PT; Pv=0; }
-  else {
-    /* DIRECTIONAL beat magnetism (v6 WAVE A.2 item 1, NEVER MOVE BACKWARD): once
-       input is quiet, ease PT only onto the nearest resting point AT OR AHEAD of P
-       in the lastDir direction (a tiny epsilon behind counts as basically-there).
-       If no rest lies ahead, DO NOT MOVE: the board never settles backward. */
-    if((now-lastInteract)>250){
-      var target=null, bestD=1e9;
-      for(var ri=0;ri<BEAT_RESTS.length;ri++){
-        var r=BEAT_RESTS[ri];
-        var ahead=(lastDir>=0)?(r>=P-MAG_EPS):(r<=P+MAG_EPS);   /* only forward candidates */
-        if(!ahead) continue;
-        /* FORWARD-CATCH (board item 2): prefer the nearest rest at or ahead of PT in
-           the travel direction, so a press that lands mid-band is pulled onto the NEXT
-           rest instead of drifting past it. Rests already behind PT get a penalty so a
-           just-overshot press still snaps to the rest it landed near, not the far one. */
-        var signed=(lastDir>=0)?(r-PT):(PT-r);   /* >=0 = ahead of PT in travel dir */
-        var dj=(signed>=-MAG_EPS)?Math.abs(r-PT):(Math.abs(r-PT)+1);
-        if(dj<bestD){ bestD=dj; target=r; }
-      }
-      if(target!=null) PT+=(target-PT)*Math.min(1,dt*3.2);      /* none ahead -> stay put */
-    }
-    var tgt=clamp(PT,-0.06,1.06);
-    var accel=SPRING_K*(tgt-P)-SPRING_D*Pv;
-    Pv+=accel*dt; P+=Pv*dt;
-    /* rubber-band: pull P (and an idle PT) back inside [0,1] */
-    if(P<0){ P+=(-P)*Math.min(1,dt*8); if(PT<0&&(now-lastInteract)>90) PT+=(-PT)*Math.min(1,dt*6); }
-    if(P>1){ P+=(1-P)*Math.min(1,dt*8); if(PT>1&&(now-lastInteract)>90) PT+=(1-PT)*Math.min(1,dt*6); }
-  }
+  if(tweenActive && !REDUCED){ driveTween(now,dt); }
+  else { _dPdt=0; }   /* at rest the corridor drive decays to idle */
   applyStoryboard(); watchFps(); requestAnimationFrame(tick);
 }
 
@@ -857,6 +1002,13 @@ function melSay(txt){
   c.classList.remove('show'); void c.offsetWidth; c.classList.add('show');
 }
 function openFlow(){
+  /* STEP MODEL: the flow is entered FROM the ask beat (either a forward step off
+     it, or a node/CTA click). Pin beatIdx + P to the ask rest so closeFlow returns
+     there exactly, and stop any tween. While flowOpen the stepper is disarmed
+     (stepArmed/step both early-return on flowOpen); the flow owns input. */
+  var askIdx=BEAT_RESTS.length-2;
+  tweenActive=false; wheelAccum=0;
+  beatIdx=askIdx; P=PT=BEAT_RESTS[askIdx]; _dPdt=0;
   flowOpen=true; answers=[]; flowStack=['q1'];
   document.body.classList.add('flowMode');   /* the ring + rails clear out */
   $('flowScrim').classList.add('on');
@@ -877,9 +1029,12 @@ function flowBack(){
   renderStep(flowStack[flowStack.length-1]);
 }
 function closeFlow(){
-  /* land on P=0.94; lastDir forward so directional magnetism settles onto the ask
-     rest 0.955 (not backward to the family beat) and never re-opens the flow */
-  flowOpen=false; PT=0.94; P=0.94; Pv=0; lastDir=1; reverseAccum=0; lastInteract=performance.now();
+  /* STEP MODEL: closing the flow returns to the ask beat. Land P EXACTLY on the
+     ask rest (0.955, index len-2) and set beatIdx to it, so the stepper is armed
+     right on the ask and a further forward step re-opens the flow cleanly. */
+  var askIdx=BEAT_RESTS.length-2;
+  flowOpen=false; beatIdx=askIdx; P=PT=BEAT_RESTS[askIdx]; _dPdt=0; tweenActive=false;
+  wheelAccum=0; arrivalTime=performance.now();
   parkForm(); melSay('');
   document.body.classList.remove('flowMode');
   $('flowScrim').classList.remove('on');
