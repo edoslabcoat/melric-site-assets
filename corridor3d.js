@@ -89,6 +89,17 @@
   var _v0 = new THREE.Vector3();
   var _up = new THREE.Vector3(0, 1, 0);
 
+  // ---- Scroll-coupled dolly (v6, additive; Eric law 5 + 8c) -------------------
+  // The tunnel SPRINTS only while the user is scrolling, then settles to a
+  // barely-there luxurious drift when parked. Two inputs, set from site.js via
+  // window.corridorSetDrive(drive, pushIn):
+  //   _drive  [0..1] = how hard the user is scrolling right now (spring velocity)
+  //   _pushIn [0..1] = the storyboard scroll DEPTH; we dolly by its CHANGE only
+  // The delta form is load-bearing: adding the full depth every frame (the naive
+  // form) re-adds depth forever and the camera runs away. Distance-per-frame =
+  // idle drift (tiny) + a drive-scaled sprint + the frame-over-frame push delta.
+  var _drive = 0, _pushIn = 0, _lastPushIn = 0, _driveActive = false;
+
   // ===========================================================================
   // Glyph atlas — a canvas full of randomly placed 0s and 1s, green on black.
   // ===========================================================================
@@ -456,7 +467,17 @@
     animId = requestAnimationFrame(animate);
     var dt = Math.min(0.05, clock.getDelta());
 
-    distanceTraveled += CONFIG.SPEED * dt;
+    if (_driveActive) {
+      // Scroll-coupled: sprint while scrolling, near-still drift when parked.
+      // Idle floor 0.06 keeps the tunnel alive; drive*1.3 is the sprint.
+      distanceTraveled += CONFIG.SPEED * dt * (0.06 + _drive * 1.3);
+      // Dolly by the CHANGE in scroll depth (delta form; the naive form runs away).
+      distanceTraveled += (_pushIn - _lastPushIn) * CONFIG.NODE_SPACING * 1.2;
+      _lastPushIn = _pushIn;
+    } else {
+      // Default (API never called / reduced-motion never drives): original constant flythrough.
+      distanceTraveled += CONFIG.SPEED * dt;
+    }
 
     // Determine the node we're at based on arclength (NODE_SPACING per node).
     nodeCursor = Math.floor(distanceTraveled / CONFIG.NODE_SPACING);
@@ -507,7 +528,11 @@
     var _breath = Math.pow(0.5 - 0.5 * Math.cos(_bt * Math.PI * 2), 0.8);
     // Breath light back to ORIGINAL values (Eric reverted the +30% global surge — it brightened
     // the whole scene; the wanted effect is ONLY the localized node-charge below). 0.8..1.0.
-    if (camLight) camLight.intensity = CONFIG.NEAR_BRIGHTNESS * (0.8 + 0.6 * _breath);
+    // v6: when the scroll-coupled dolly is armed, calm the global base light to ~0.62x so the
+    // plane-local pools (orb breath, node breaths/blooms) read as pools instead of washing out.
+    // Reduced-motion never arms the drive, so its base brightness is unchanged.
+    var _baseMul = _driveActive ? 0.62 : 1.0;
+    if (camLight) camLight.intensity = CONFIG.NEAR_BRIGHTNESS * _baseMul * (0.8 + 0.6 * _breath);
     // MELRIC'S BREATH CHARGES THE GLYPHS ON ITS OWN PLANE (Eric: real physics — a light source
     // in a tunnel lights the wall RING around itself, never tunnel "in the future"). Range is
     // capped just past the wall ring (BASE_RADIUS 12 → range 17.5): geometry one node deeper
@@ -564,6 +589,48 @@
     // charge ACCUMULATES (never cuts a fading charge down) — repeated signals keep the walls fed
     flashLight.intensity = Math.max(flashLight.intensity || 0,
       CONFIG.NEAR_BRIGHTNESS * 3.0 * (strength || 1)); // ≈ +30% on the node's wall patch (×1.5 compensates the tight range)
+  };
+
+  // ===========================================================================
+  // Scroll-coupled dolly setter (v6, additive). site.js calls this each frame
+  // with drive = |spring velocity| (0..1) and pushIn = storyboard depth (0..1).
+  // The first call arms _driveActive so the delta-dolly takes over from the
+  // constant flythrough. Reduced-motion never calls it -> constant idle stays.
+  // ===========================================================================
+  window.corridorSetDrive = function (drive, pushIn) {
+    // board fix D1: on arming, seed BOTH sides of the delta so the first armed
+    // animate frame can never consume a 0 -> depth step (scroll-restore lurch).
+    if (!_driveActive) { _driveActive = true; _lastPushIn = _pushIn = (pushIn || 0); }
+    _drive = drive < 0 ? 0 : (drive > 1 ? 1 : drive);
+    _pushIn = pushIn || 0;
+  };
+
+  // ===========================================================================
+  // Plane-local node breath lights (v6, Eric law 10): a small pool of range-
+  // limited PointLights parented to the camera, one per ring node, that light
+  // ONLY the near tunnel wall on their own z-plane. Driven by each node's soft
+  // breath + arrival bloom (site.js passes screen-space anchors + breath level).
+  // Same physics as the orb breath + flash lights: tight range, decay 2, so the
+  // deep tunnel behind them never lifts. Cheap: the pool is created once.
+  // ===========================================================================
+  var REDUCED_C = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var nodeBreathLights = [];
+  window.corridorSetNodeLight = function (idx, nx, ny, level) {
+    if (!camera || REDUCED_C) return;
+    var pl = nodeBreathLights[idx];
+    if (!pl) {
+      // range 11 (per spec): reaches the near wall ring on this plane only.
+      pl = new THREE.PointLight(CONFIG.GREEN, 0, 11.0, 2.0);
+      camera.add(pl);
+      nodeBreathLights[idx] = pl;
+    }
+    if (level <= 0.001) { pl.intensity = 0; return; }
+    // map screen 0..1 -> camera-space lateral offset, same mapping as the flash light
+    var cx = (nx < 0 ? 0 : (nx > 1 ? 1 : nx)) * 2 - 1;
+    var cy = (ny < 0 ? 0 : (ny > 1 ? 1 : ny)) * 2 - 1;
+    var spread = 4.2;
+    pl.position.set(cx * spread * (camera.aspect || 1.6), -cy * spread, -9);
+    pl.intensity = CONFIG.NEAR_BRIGHTNESS * 1.6 * level; // soft, below the orb pool
   };
 
   // ===========================================================================

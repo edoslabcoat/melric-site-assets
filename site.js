@@ -207,7 +207,7 @@ function layoutHub(){
   var cx=W/2,cy=H/2,R=Math.max(margin,Math.min(W,H)/2-margin);
   /* phones: pull the widget ring in so side nodes stay on screen */
   var R2=(W<700)?(Math.min(W,H)/2-72):Math.max(230,Math.min(W,H)/2-140);
-   var svg=$('links'); if(svg) svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  var svg=$('links'); if(svg) svg.setAttribute('viewBox','0 0 '+W+' '+H);
   var ob=$('orb'); if(ob&&!flowOpen&&!orbIsUp){ ob.style.left=cx+'px'; ob.style.top=cy+'px'; }
   var gi=0;
   NODES.forEach(function(a,i){
@@ -227,14 +227,93 @@ function placeKnob(){
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function smooth(e0,e1,x){ var t=clamp((x-e0)/(e1-e0),0,1); return t*t*(3-2*t); }
 
+/* ---- headline de-rez (v6): as the hero exits, letters blur / drift / push into
+   the tunnel, staggered by index (P-driven, so dropped frames never desync it).
+   The H1 lives in Webflow markup; we wrap it at runtime. Words become nowrap
+   .hw units (so a line only ever breaks BETWEEN words, never mid-word) with
+   per-letter .hc spans inside; the existing <br> and <span class="soft"> are
+   preserved. Degrades gracefully if the H1 is absent; skipped in reduced-motion. ---- */
+var headlineChars=[];
+/* wrap ONE text node in place: insert nowrap word-units + per-letter spans just
+   BEFORE it, then remove it (preserves sibling order: the <br>, the .soft span). */
+function wrapTextNode(node){
+  var txt=node.nodeValue, parent=node.parentNode, i=0;
+  while(i<txt.length){
+    if(txt[i]===' '){
+      parent.insertBefore(document.createTextNode(' '),node);   /* a real break opportunity */
+      while(i<txt.length&&txt[i]===' ') i++;
+    } else {
+      var word=document.createElement('span'); word.className='hw';   /* nowrap unit */
+      while(i<txt.length&&txt[i]!==' '){
+        var ch=document.createElement('span'); ch.className='hc'; ch.textContent=txt[i];
+        word.appendChild(ch); headlineChars.push(ch); i++;
+      }
+      parent.insertBefore(word,node);
+    }
+  }
+  parent.removeChild(node);
+}
+function buildHeadline(){
+  if(REDUCED) return;
+  var h1=document.querySelector('#hero h1'); if(!h1) return;   /* graceful if absent */
+  headlineChars.length=0;
+  /* wrap every text node (top-level + inside child spans like .soft); <br> untouched */
+  var texts=[];
+  (function collect(el){
+    var kids=Array.prototype.slice.call(el.childNodes);
+    kids.forEach(function(n){
+      if(n.nodeType===3){ if(n.nodeValue.replace(/\s/g,'').length) texts.push(n); }
+      else if(n.nodeName==='SPAN'){ collect(n); }
+    });
+  })(h1);
+  texts.forEach(wrapTextNode);
+}
+function derezHeadline(){
+  if(REDUCED||!headlineChars.length) return;
+  var pHero=clamp(P/0.11,0,1);          /* hero exits by P~0.11 (matches hero opacity band) */
+  var N=headlineChars.length;
+  for(var i=0;i<N;i++){
+    var frac=i/(N-1||1);
+    var local=clamp((pHero-frac*0.28)/0.5,0,1);   /* sweep across the line, letter by letter */
+    var op=1-local, blurPx=local*9, yT=-local*14, rot=(i%2?1:-1)*local*8, xT=(i%3-1)*local*10;
+    var ch=headlineChars[i];
+    ch.style.opacity=op.toFixed(3);
+    ch.style.filter=blurPx>0.05?('blur('+blurPx.toFixed(2)+'px)'):'none';
+    ch.style.transform='translateY('+yT.toFixed(1)+'px) translateX('+xT.toFixed(1)+'px) scale('+(1-local*0.12).toFixed(3)+') rotate('+rot.toFixed(2)+'deg)';
+  }
+}
+
 var P=0, PT=0, lineGrow=0, elecOn=0, flowOpen=false, contactOpen=false, familyOn=false;
 var sendPulse=null, _cardEntered=-1, _focusOn=false;
+
+/* ---- gesture feel (v6): spring-chased P + rubber-band + beat magnetism.
+   PT is the TARGET the gesture wants; P chases it with a critically-damped
+   spring (k=150) so scrolling mid-beat moves the beat mid-flight and nothing
+   waits for you. Pv is the spring velocity, also the "drive" that sprints the
+   tunnel. Reduced-motion snaps P=PT (no spring) so nothing animates. ---- */
+var Pv=0;                                   /* spring velocity */
+var lastInteract=0;                         /* ms of the last gesture (for magnetism) */
+var SPRING_K=150;                           /* stiffness (Eric-approved feel) */
+var SPRING_D=2*Math.sqrt(SPRING_K);         /* critical damping (~24.5) */
+function setTarget(v){ PT=clamp(v,-0.06,1.06); lastInteract=performance.now(); } /* allow rubber-band overshoot at the ends */
 
 /* storyboard bands */
 var CARD_BANDS=[ [0.16,0.30], [0.30,0.44], [0.44,0.58] ];
 var DISSOLVE=[0.58,0.63];   /* C-suite fades out */
 var GHOST_START=0.62;       /* widgets + rails ring in staggered */
 var FLIP=0.815;             /* the toggle flips to Family */
+
+/* beat resting points (v6 magnetism): the readable CENTER of each existing v5
+   beat, derived from the bands above. When input goes quiet, PT eases onto the
+   nearest of these so every beat is a calm stop on the journey. Order:
+   hero, CMO page, CFO page, COO page, work cockpit, family cockpit, the ask.
+   (CARD_BANDS centers: 0.23 / 0.37 / 0.51; cockpit settles after ghost ring-in
+   ~0.62..0.79 -> 0.75; family after FLIP 0.815 before the ask captions -> 0.83;
+   the ask before openFlow at 0.968 -> 0.955. Final rest 0.978 (board fix D5,
+   CEO call): idling past the 0.9665 midpoint glides INTO the qualifier flow so
+   the journey cannot dead-end one notch short of the form; closeFlow resets P
+   to 0.94 whose nearest rest is 0.955, so closing never re-opens it.) */
+var BEAT_RESTS=[0, 0.23, 0.37, 0.51, 0.75, 0.83, 0.955, 0.978];
 
 var CAPS=[
   {at:0.095,until:0.16,txt:'You just hired your C-suite.'},
@@ -387,7 +466,16 @@ function applyStoryboard(){
   lineGrow=smooth(0.07,0.15,P);
   elecOn=(REDUCED||hideRing)?0:smooth(0.12,0.20,P)*(cs?(1-0.55*cs.vis):1);
 
+  /* v6 tunnel dolly: sprint while scrolling (drive = spring velocity), settle to
+     a barely-there drift when parked; dolly by scroll DEPTH (P). Reduced-motion
+     never drives (constant idle corridor stays). */
+  if(!REDUCED && window.corridorSetDrive){
+    var drive=Math.min(1,Math.abs(Pv)*2.5);
+    window.corridorSetDrive(drive, clamp(P,0,1));
+  }
+
   var hero=$('hero'); if(hero) hero.style.opacity=(1-smooth(0.03,0.10,P)).toFixed(3);
+  derezHeadline();   /* v6: per-letter de-rez of the H1 into the tunnel as the hero exits */
   var hint=$('hint'); if(hint) hint.style.opacity=(1-smooth(0.02,0.08,P)).toFixed(3);
 
   var cap=''; CAPS.forEach(function(c){ if(P>=c.at&&P<c.until) cap=c.txt; });
@@ -439,19 +527,69 @@ function renderPage(cs){
   }
 }
 
-/* ---- gesture driver. The page itself never scrolls. ---- */
-window.addEventListener('wheel',function(e){ if(flowOpen||contactOpen) return; e.preventDefault(); PT=clamp(PT+e.deltaY*0.00050,0,1); },{passive:false});
-var _ty=null;
-window.addEventListener('touchstart',function(e){ _ty=e.touches[0].clientY; },{passive:true});
-window.addEventListener('touchmove',function(e){ if(flowOpen||contactOpen||_ty==null) return; var y=e.touches[0].clientY; PT=clamp(PT+(_ty-y)*0.0010,0,1); _ty=y; e.preventDefault(); },{passive:false});
+/* ---- gesture driver (v6). The page itself never scrolls. Wheel deltas are
+   normalized across deltaMode; touch is 1:1 scrub + momentum fling; keys step
+   ~11 presses across the whole board (the old 0.032 step felt dead). All input
+   sets the TARGET PT; the spring in tick() chases it, so input works mid-flight. ---- */
+window.addEventListener('wheel',function(e){
+  if(flowOpen||contactOpen) return; e.preventDefault();
+  var d=e.deltaY;
+  if(e.deltaMode===1) d*=16;         /* lines -> px */
+  else if(e.deltaMode===2) d*=400;   /* pages -> px */
+  d=clamp(d,-140,140);               /* tame one violent trackpad kick */
+  setTarget(PT+d*0.00075);
+},{passive:false});
+
+/* keys: ~11 presses cover the board (was 0.032, far too small -> hero felt dead) */
+var KEY_STEP=1/11;
 window.addEventListener('keydown',function(e){
   if(e.key==='Escape'){ if(contactOpen) closeContact(); else if(flowOpen) closeFlow(); return; }
   if(flowOpen||contactOpen) return;
-  if(e.key==='ArrowDown'||e.key===' ') PT=clamp(PT+0.032,0,1);
-  if(e.key==='ArrowUp') PT=clamp(PT-0.032,0,1);
+  if(e.key==='ArrowDown'||e.key==='PageDown'||e.key===' '||e.key==='Spacebar'){ e.preventDefault(); setTarget(PT+KEY_STEP); }
+  else if(e.key==='ArrowUp'||e.key==='PageUp'){ e.preventDefault(); setTarget(PT-KEY_STEP); }
+  else if(e.key==='Home'){ e.preventDefault(); setTarget(0); }
+  else if(e.key==='End'){ e.preventDefault(); setTarget(1); }
 });
+
+/* touch: 1:1 scrub while dragging + momentum fling on release + rubber-band */
+var _tActive=false,_tStartY=0,_tStartP=0,_tLastY=0,_tLastT=0,_tVel=0;
+window.addEventListener('touchstart',function(e){
+  if(flowOpen||contactOpen) return;
+  _tActive=true; _tStartY=_tLastY=e.touches[0].clientY; _tStartP=PT; _tLastT=performance.now(); _tVel=0;
+},{passive:true});
+window.addEventListener('touchmove',function(e){
+  if(flowOpen||contactOpen||!_tActive) return; e.preventDefault();
+  var y=e.touches[0].clientY, now=performance.now();
+  var dP=(_tStartY-y)/(window.innerHeight*1.15);   /* ~one screen height covers the board */
+  setTarget(_tStartP+dP);
+  var dt=Math.max(1,now-_tLastT); _tVel=(_tLastY-y)/dt; _tLastY=y; _tLastT=now;
+},{passive:false});
+window.addEventListener('touchend',function(){
+  if(!_tActive) return; _tActive=false;
+  var fling=clamp(_tVel,-3,3)*0.42;                /* carry velocity into the target */
+  setTarget(PT+fling);
+},{passive:true});
+
+/* spring-chased P (critically damped) + rubber-band at the ends + beat magnetism.
+   Reduced-motion snaps (no spring, no magnetism) so nothing moves on its own. */
 function tick(){
-  if(REDUCED){ P=PT; } else { P+=(PT-P)*0.12; if(Math.abs(PT-P)<0.0002) P=PT; }
+  var now=performance.now();
+  var dt=(tick._last==null)?0.016:Math.min(0.05,(now-tick._last)/1000); tick._last=now;
+  if(REDUCED){ P=PT; Pv=0; }
+  else {
+    /* beat magnetism: once input is quiet, ease PT onto the nearest resting point */
+    if((now-lastInteract)>250){
+      var nearest=BEAT_RESTS[0], bestD=1e9;
+      for(var ri=0;ri<BEAT_RESTS.length;ri++){ var dj=Math.abs(BEAT_RESTS[ri]-PT); if(dj<bestD){ bestD=dj; nearest=BEAT_RESTS[ri]; } }
+      PT+=(nearest-PT)*Math.min(1,dt*2.2);
+    }
+    var tgt=clamp(PT,-0.06,1.06);
+    var accel=SPRING_K*(tgt-P)-SPRING_D*Pv;
+    Pv+=accel*dt; P+=Pv*dt;
+    /* rubber-band: pull P (and an idle PT) back inside [0,1] */
+    if(P<0){ P+=(-P)*Math.min(1,dt*8); if(PT<0&&(now-lastInteract)>90) PT+=(-PT)*Math.min(1,dt*6); }
+    if(P>1){ P+=(1-P)*Math.min(1,dt*8); if(PT>1&&(now-lastInteract)>90) PT+=(1-PT)*Math.min(1,dt*6); }
+  }
   applyStoryboard(); watchFps(); requestAnimationFrame(tick);
 }
 
@@ -479,6 +617,7 @@ var BREATH=3600; /* ms, matches the CSS nbreathe cycle */
 function pulseNode(a){
   var el=$('node-'+a.id); if(!el) return;
   el.classList.add('flare'); clearTimeout(el._ft); el._ft=setTimeout(function(){ el.classList.remove('flare'); },900);
+  a._bloom=1;   /* v6: arrival blooms the node's green wall pool, then decays back into the breath */
   try{ if(window.corridorNodeFlash && a._x!=null) window.corridorNodeFlash(a._x/stage.clientWidth,a._y/stage.clientHeight,1); }catch(e){}
 }
 function startNeuro(){
@@ -486,25 +625,56 @@ function startNeuro(){
   function resize(){ W=cv.width=stage.clientWidth||900; H=cv.height=stage.clientHeight||600; }
   resize(); window.addEventListener('resize',function(){ clearTimeout(cv._rt); cv._rt=setTimeout(function(){ resize(); layoutHub(); placeKnob(); },180); });
   var pulses=[];
+  var _nLast=performance.now();   /* hoisted: frame-delta for bloom decay (no per-frame alloc) */
   sendPulse=function(a,sp){ pulses.push({a:a,t:0,sp:sp||0.012}); };
   (function frame(now){
     now=now||performance.now(); ctx.clearRect(0,0,W,H);
+    var dt=Math.min(0.05,(now-_nLast)/1000); _nLast=now;
     var cx=W/2,cy=H/2;
     var blue=document.body.classList.contains('familyMode');
     var lineCol=blue?'rgba(140,210,255,':'rgba(94,255,160,';
     NODES.forEach(function(a,i){
       if(a._lv==null) a._lv=0;
       a._lv+=((a._rv||0)-a._lv)*0.10;                 /* lines ease in and out */
-      if(a._x==null||a._lv<0.01) return;
+      if(a._x==null||a._lv<0.01){
+        if(a._bloom==null) a._bloom=0;
+        /* board fix D2: zero this node's wall pool when it leaves the ring, or the
+           light stays lit forever behind the node pages / the ask (calm beats). */
+        if(!REDUCED&&window.corridorSetNodeLight&&a._x!=null) window.corridorSetNodeLight(i, a._x/W, a._y/H, 0);
+        return;
+      }
       var gx=cx+(a._x-cx)*lineGrow, gy=cy+(a._y-cy)*lineGrow;
       ctx.strokeStyle=lineCol+(0.30*lineGrow*a._lv).toFixed(3)+')'; ctx.lineWidth=1.3;
       ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(gx,gy); ctx.stroke();
-      /* breathing charges the wall at this node's plane, between pulses too */
-      if(!REDUCED&&a._rv>0.55&&window.corridorNodeFlash){
-        var ph=((now+i*530)%BREATH)/BREATH;
-        if(ph>0.20&&ph<0.32){
+
+      /* v6 SINGLE-PULSE comet cadence (Eric law 8): one discrete comet per node
+         per 3.6s breath cycle, staggered 1.2s apart, so no two ever depart
+         together. This is the calm silk-thread pulse, not the random electricity.
+         The comet render + arrival flare are the existing mechanics below. */
+      if(!REDUCED&&a._rv>0.55){
+        var pc=Math.floor((now - i*1200)/BREATH);       /* breath-cycle index for node i */
+        if(a._pc==null) a._pc=pc;
+        if(pc>a._pc){ a._pc=pc; pulses.push({a:a,t:0,sp:0.0132}); } /* one comet, ~1.5s travel */
+      }
+
+      /* per-node arrival bloom decays back into the breath (green, never white) */
+      if(a._bloom==null) a._bloom=0;
+      if(a._bloom>0.002) a._bloom*=Math.exp(-dt*3.2); else a._bloom=0;
+
+      /* soft node breath (subtler than the orb, phase-offset by 1.2s) drives BOTH
+         the wall pool and stays under the orb's amplitude (law 9). */
+      var nph=(((now - i*1200)%BREATH)+BREATH)%BREATH/BREATH;
+      var nb=Math.pow(0.5-0.5*Math.cos(nph*Math.PI*2),0.9);
+      /* plane-local wall light at this node's anchor: soft breath + arrival bloom */
+      if(!REDUCED&&window.corridorSetNodeLight){
+        var lvl=a._rv*(0.35+0.40*nb+0.85*a._bloom);
+        window.corridorSetNodeLight(i, a._x/W, a._y/H, lvl);
+      }
+      /* keep the existing wall-charge accumulation at the breath peak, too */
+      if(!REDUCED&&window.corridorNodeFlash){
+        if(nph>0.20&&nph<0.32){
           if(!a._bf){ a._bf=true; try{ window.corridorNodeFlash(a._x/W,a._y/H,0.32); }catch(e){} }
-        } else if(ph>0.5) a._bf=false;
+        } else if(nph>0.5) a._bf=false;
       }
     });
     if(elecOn>0.2){
@@ -565,7 +735,7 @@ function openFlow(){
   renderStep('q1');
 }
 function closeFlow(){
-  flowOpen=false; PT=0.94; P=0.94;
+  flowOpen=false; PT=0.94; P=0.94; Pv=0; lastInteract=performance.now();
   parkForm(); melSay('');
   document.body.classList.remove('flowMode');
   $('flowScrim').classList.remove('on');
@@ -633,6 +803,7 @@ function boot3d(){
 
 window.addEventListener('load',function(){
   buildRing();
+  buildHeadline();   /* v6: wrap the H1 into per-letter spans for the de-rez */
   var cslot=$('contactFormSlot'), cwrap=$('contactFormWrap');
   if(cslot&&cwrap) cslot.appendChild(cwrap);
   var qf=document.getElementById('qualifier-path'); if(qf) qf.type='hidden';

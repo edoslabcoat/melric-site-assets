@@ -24,6 +24,10 @@ html,body{margin:0;height:100%;background:#000;color:var(--text);overflow:hidden
 #hero .eyebrow{font-size:12px;letter-spacing:.36em;text-transform:uppercase;color:var(--accent);text-shadow:0 0 10px rgba(46,230,111,.6);margin-bottom:14px}
 #hero h1{font-family:'Raleway',sans-serif;font-weight:200;font-size:clamp(28px,4.6vw,52px);color:#fff;line-height:1.08;text-shadow:0 2px 30px rgba(0,0,0,.95);margin:0}
 #hero h1 .soft{color:var(--dim)}
+/* v6 headline de-rez: words are nowrap units (a line breaks only BETWEEN words),
+   letters inside de-rez independently into the tunnel. site.js drives .hc per-frame. */
+#hero h1 .hw{display:inline-block;white-space:nowrap}
+#hero h1 .hc{display:inline-block;will-change:transform,opacity,filter}
 
 #phaseCap{position:fixed;left:0;right:0;bottom:8%;z-index:5;text-align:center;pointer-events:none;
   font-family:'Raleway',sans-serif;font-weight:300;font-size:clamp(18px,2.6vw,26px);color:#fff;
@@ -387,13 +391,11 @@ body.nodeFocus #modeTog,body.flowMode #modeTog,body.nodeFocus #cockCap,body.flow
   .node::before{animation:none}
 }
 
-
 /* v5.1: kill every last v4 box. Widgets stay boxless in family mode and on
    flare; the glow lives only in the radial pseudo layers. */
 body.familyMode .node.widget{background:none;border:none;box-shadow:none;backdrop-filter:none}
 .node.widget.flare,body.familyMode .node.widget.flare{background:none;border:none;box-shadow:none}
 .node.widget.lit,body.familyMode .node.widget.lit{background:none;border:none;box-shadow:none}
-
 
 /* v5.2: qualifier answers read as BUTTONS. Wider spacing, green light coming
    from BEHIND each option (soft pulsing backlight), hover glows brighter.
