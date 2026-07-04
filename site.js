@@ -295,34 +295,83 @@ var Pv=0;                                   /* spring velocity */
 var lastInteract=0;                         /* ms of the last gesture (for magnetism) */
 var SPRING_K=150;                           /* stiffness (Eric-approved feel) */
 var SPRING_D=2*Math.sqrt(SPRING_K);         /* critical damping (~24.5) */
+
+/* ---- NEVER MOVE BACKWARD (v6 WAVE A.2, Eric punch list item 1). "Really the
+   main thing." The board must only ever settle FORWARD along the direction the
+   user last drove. Two mechanisms:
+   (1) DIRECTIONAL MAGNETISM (in tick): when input goes quiet, only rests at or
+       AHEAD of P in lastDir count as candidates (a tiny epsilon behind catches
+       you're-basically-there); pick the nearest ahead; if none, DO NOT MOVE.
+   (2) REVERSE BUFFER: input opposite to lastDir is accumulated in reverseAccum
+       instead of applied. Direction only flips once the accumulated opposite
+       intent clears a deliberate threshold (~2 wheel clicks / ~40px drag). Keys
+       are deliberate, so an opposite key flips immediately. ---- */
+var lastDir=1;                              /* sign of the most recent applied user input (+1 fwd, -1 back) */
+var reverseAccum=0;                         /* buffered opposite-direction intent (same units as PT delta) */
+var lastInputT=0;                           /* ms of the most recent raw input event (for reverse-buffer reset) */
+var WHEEL_STEP=0.075;                       /* a typical wheel-click normalized PT delta (~100px x 0.00075; the 140px cap is the max) */
+var REVERSE_WHEEL=2*WHEEL_STEP;             /* ~2 wheel clicks of opposite intent flips direction */
+var REVERSE_TOUCH_PX=40;                    /* ~40px deliberate opposite drag flips direction */
+var REVERSE_QUIET=600;                      /* ms of quiet resets the reverse buffer */
+var MAG_EPS=0.004;                          /* rests this far behind P still count as candidates (basically-there) */
+
+/* Route a raw input delta through the reverse buffer, then set the target.
+   dRaw is the desired change to PT; thresh is how much opposite intent this input
+   type needs to accumulate before it may flip direction (keys pass thresh=0 =
+   deliberate). Returns nothing; applies via setTarget only when allowed. */
+function driveBy(dRaw,thresh){
+  var now=performance.now();
+  if(now-lastInputT>REVERSE_QUIET) reverseAccum=0;   /* stale opposite intent decays away */
+  lastInputT=now;
+  var dir=dRaw<0?-1:1;
+  if(dir===lastDir || dRaw===0){
+    reverseAccum=0;                                  /* continuing forward clears any buffered reversal */
+    setTarget(PT+dRaw);
+    return;
+  }
+  /* opposite to lastDir: buffer it, do not move yet */
+  reverseAccum+=Math.abs(dRaw);
+  if(reverseAccum>=thresh){
+    lastDir=dir; reverseAccum=0;
+    setTarget(PT+dRaw);                              /* the accumulated intent now applies */
+  }
+}
 function setTarget(v){ PT=clamp(v,-0.06,1.06); lastInteract=performance.now(); } /* allow rubber-band overshoot at the ends */
 
-/* storyboard bands */
-var CARD_BANDS=[ [0.16,0.30], [0.30,0.44], [0.44,0.58] ];
-var DISSOLVE=[0.58,0.63];   /* C-suite fades out */
-var GHOST_START=0.62;       /* widgets + rails ring in staggered */
-var FLIP=0.815;             /* the toggle flips to Family */
+/* storyboard bands
+   PACING REBALANCE (v6 WAVE A.2, Eric staging punch list item 2): the hero band
+   is compressed (hero fully exits by ~0.11, ring nodes fully formed by ~0.135),
+   then a CLEAR RING BEAT: 0.135..0.25 has nothing on stage but the 3 C-suite
+   nodes, fully formed, breathing and pulsing, with a beat rest at 0.19 centered
+   in it. Only after that does CMO enter. Every downstream band keeps its relative
+   order and behavior, just re-timed later to make room for the ring beat. */
+var RING_REST=0.19;         /* the clear C-suite ring beat rest (before any node entry) */
+var CARD_BANDS=[ [0.25,0.37], [0.37,0.49], [0.49,0.61] ];
+var DISSOLVE=[0.61,0.66];   /* C-suite fades out */
+var GHOST_START=0.65;       /* widgets + rails ring in staggered */
+var FLIP=0.83;              /* the toggle flips to Family */
 
 /* beat resting points (v6 magnetism): the readable CENTER of each existing v5
    beat, derived from the bands above. When input goes quiet, PT eases onto the
-   nearest of these so every beat is a calm stop on the journey. Order:
-   hero, CMO page, CFO page, COO page, work cockpit, family cockpit, the ask.
-   (CARD_BANDS centers: 0.23 / 0.37 / 0.51; cockpit settles after ghost ring-in
-   ~0.62..0.79 -> 0.75; family after FLIP 0.815 before the ask captions -> 0.83;
-   the ask before openFlow at 0.968 -> 0.955. Final rest 0.978 (board fix D5,
-   CEO call): idling past the 0.9665 midpoint glides INTO the qualifier flow so
-   the journey cannot dead-end one notch short of the form; closeFlow resets P
-   to 0.94 whose nearest rest is 0.955, so closing never re-opens it.) */
-var BEAT_RESTS=[0, 0.23, 0.37, 0.51, 0.75, 0.83, 0.955, 0.978];
+   nearest resting point AHEAD in the travel direction (never behind). Order:
+   hero, RING beat, CMO page, CFO page, COO page, work cockpit, family cockpit,
+   the ask, final. (RING rest 0.19 is the new clear C-suite ring beat. CARD_BANDS
+   centers: 0.31 / 0.43 / 0.55; cockpit settles after ghost ring-in ~0.65..0.82
+   -> 0.76; family after FLIP 0.83 before the ask captions -> 0.84; the ask before
+   openFlow at 0.968 -> 0.955. Final rest 0.978 (board fix D5, CEO call): idling
+   past the 0.9665 midpoint glides INTO the qualifier flow so the journey cannot
+   dead-end one notch short of the form; closeFlow resets P to 0.94 whose nearest
+   forward rest is 0.955, so closing never re-opens it.) */
+var BEAT_RESTS=[0, RING_REST, 0.31, 0.43, 0.55, 0.76, 0.84, 0.955, 0.978];
 
 var CAPS=[
-  {at:0.095,until:0.16,txt:'You just hired your C-suite.'},
-  {at:0.645,until:0.695,txt:'And MELRIC is not one product.'},
-  {at:0.695,until:0.75,txt:'It is custom built for you and your business.'},
-  {at:0.75,until:0.805,txt:'More money. More time. More leads.'},
-  {at:0.845,until:0.90,txt:'Because MELRIC runs your home too.'},
-  {at:0.90,until:0.945,txt:'More time for your family. That is the point.'},
-  {at:0.945,until:2,txt:'See if MELRIC fits your life.'}
+  {at:0.115,until:0.25,txt:'You just hired your C-suite.'},
+  {at:0.665,until:0.715,txt:'And MELRIC is not one product.'},
+  {at:0.715,until:0.77,txt:'It is custom built for you and your business.'},
+  {at:0.77,until:0.82,txt:'More money. More time. More leads.'},
+  {at:0.855,until:0.905,txt:'Because MELRIC runs your home too.'},
+  {at:0.905,until:0.95,txt:'More time for your family. That is the point.'},
+  {at:0.95,until:2,txt:'See if MELRIC fits your life.'}
 ];
 
 function cardState(){
@@ -337,8 +386,23 @@ function cardState(){
   return null;
 }
 
+/* GREEN FLASH sweep (v6 WAVE A.2 item 4): a single clean bright-green pulse over
+   every currently-visible node and all four corner rails, on every family toggle
+   in both directions. Re-triggerable: strip then re-add .famFlash. Guarded off in
+   reduced-motion by the caller and by the CSS .reduced rule. No per-frame work. */
+function greenFlashSweep(){
+  var els=[];
+  NODES.forEach(function(a){ var el=$('node-'+a.id); if(el&&(a._rv||0)>0.05) els.push(el); });
+  ['railTL','railTR','railBL','railBR'].forEach(function(id){ var r=$(id); if(r) els.push(r); });
+  els.forEach(function(el){
+    el.classList.remove('famFlash'); void el.offsetWidth; el.classList.add('famFlash');
+    clearTimeout(el._ff); el._ff=setTimeout(function(){ el.classList.remove('famFlash'); },900);
+  });
+}
+
 /* ---- the flip ceremony: light, animated knob, soft tick, staggered morph.
-   Nodes, rails and the caption all cross to the family-blue world. ---- */
+   The toggle + page tint may stay blue; the NODES and RAILS stay green (item 4)
+   and announce the mode change with the green flash sweep above. ---- */
 function setFamily(on){
   if(familyOn===on) return;
   familyOn=on;
@@ -352,6 +416,10 @@ function setFamily(on){
     setTimeout(function(){ tog.classList.remove('flipping'); },900);
   }
   if(!REDUCED) tickSound();
+  /* GREEN FLASH (v6 WAVE A.2 item 4, both directions): one clean bright green
+     sweep across every visible node and all four corner rails on each toggle.
+     CSS .famFlash animates ~800ms then we strip the class so it can re-fire. */
+  if(!REDUCED) greenFlashSweep();
   var gi=0;
   NODES.forEach(function(a){
     if(!a.ghost) return;
@@ -437,7 +505,9 @@ function applyStoryboard(){
   NODES.forEach(function(a,i){
     var rv;
     if(i<MAIN){
-      var s=0.045+i*0.03; rv=smooth(s,s+0.055,P)*(1-dis);
+      /* compressed ring-in: all 3 mains fully formed by ~0.135, so the clear
+         ring beat (rest 0.19) shows a complete, breathing C-suite ring */
+      var s=0.045+i*0.03; rv=smooth(s,s+0.045,P)*(1-dis);
     } else {
       var gs=GHOST_START+gi*0.024; gi++;
       rv=smooth(gs,gs+0.05,P);
@@ -483,8 +553,16 @@ function applyStoryboard(){
 
   renderPage(cs);
 
+  /* ORB CENTERED ON NODE PAGES (v6 WAVE A.2 item 3): the risen orb is a child of
+     #stage, so scaling the stage around an off-center node origin drags the orb
+     sideways (CFO/COO nodes sit bottom-left/right of the ring -> orb landed off
+     to the side). Once the page owns the screen (focus/orbUp), scale the stage
+     around SCREEN CENTER so the orb lands horizontally centered at the top for
+     EVERY node page and the ask, regardless of which node was entered or width.
+     The zoom-into-node origin is only used during the pre-focus ramp. */
   var z=cs?cs.vis:0, a2=cs?NODES[cs.i]:null;
-  if(a2&&a2._x!=null){ stage.style.transformOrigin=a2._x+'px '+a2._y+'px'; }
+  if(focus||flowOpen){ stage.style.transformOrigin=(stage.clientWidth/2)+'px '+(stage.clientHeight/2)+'px'; }
+  else if(a2&&a2._x!=null){ stage.style.transformOrigin=a2._x+'px '+a2._y+'px'; }
   stage.style.transform=z>0?('scale('+(1+0.14*z).toFixed(4)+')'):'';
 
   var scrim=$('flowScrim');
@@ -537,7 +615,7 @@ window.addEventListener('wheel',function(e){
   if(e.deltaMode===1) d*=16;         /* lines -> px */
   else if(e.deltaMode===2) d*=400;   /* pages -> px */
   d=clamp(d,-140,140);               /* tame one violent trackpad kick */
-  setTarget(PT+d*0.00075);
+  driveBy(d*0.00075,REVERSE_WHEEL);  /* reverse buffer: opposite wheel needs ~2 clicks to flip */
 },{passive:false});
 
 /* keys: ~11 presses cover the board (was 0.032, far too small -> hero felt dead) */
@@ -545,10 +623,11 @@ var KEY_STEP=1/11;
 window.addEventListener('keydown',function(e){
   if(e.key==='Escape'){ if(contactOpen) closeContact(); else if(flowOpen) closeFlow(); return; }
   if(flowOpen||contactOpen) return;
-  if(e.key==='ArrowDown'||e.key==='PageDown'||e.key===' '||e.key==='Spacebar'){ e.preventDefault(); setTarget(PT+KEY_STEP); }
-  else if(e.key==='ArrowUp'||e.key==='PageUp'){ e.preventDefault(); setTarget(PT-KEY_STEP); }
-  else if(e.key==='Home'){ e.preventDefault(); setTarget(0); }
-  else if(e.key==='End'){ e.preventDefault(); setTarget(1); }
+  /* keys are deliberate: an opposite key flips direction immediately (thresh 0) */
+  if(e.key==='ArrowDown'||e.key==='PageDown'||e.key===' '||e.key==='Spacebar'){ e.preventDefault(); driveBy(KEY_STEP,0); }
+  else if(e.key==='ArrowUp'||e.key==='PageUp'){ e.preventDefault(); driveBy(-KEY_STEP,0); }
+  else if(e.key==='Home'){ e.preventDefault(); lastDir=-1; reverseAccum=0; setTarget(0); }
+  else if(e.key==='End'){ e.preventDefault(); lastDir=1; reverseAccum=0; setTarget(1); }
 });
 
 /* touch: 1:1 scrub while dragging + momentum fling on release + rubber-band */
@@ -560,14 +639,17 @@ window.addEventListener('touchstart',function(e){
 window.addEventListener('touchmove',function(e){
   if(flowOpen||contactOpen||!_tActive) return; e.preventDefault();
   var y=e.touches[0].clientY, now=performance.now();
-  var dP=(_tStartY-y)/(window.innerHeight*1.15);   /* ~one screen height covers the board */
-  setTarget(_tStartP+dP);
+  var screen=window.innerHeight*1.15;              /* ~one screen height covers the board */
+  /* feed the incremental drag delta through the reverse buffer (deliberate ~40px
+     opposite drag flips direction), so touch honours NEVER MOVE BACKWARD too */
+  var dInc=(_tLastY-y)/screen;
+  driveBy(dInc,REVERSE_TOUCH_PX/screen);
   var dt=Math.max(1,now-_tLastT); _tVel=(_tLastY-y)/dt; _tLastY=y; _tLastT=now;
 },{passive:false});
 window.addEventListener('touchend',function(){
   if(!_tActive) return; _tActive=false;
   var fling=clamp(_tVel,-3,3)*0.42;                /* carry velocity into the target */
-  setTarget(PT+fling);
+  driveBy(fling,REVERSE_TOUCH_PX/(window.innerHeight*1.15));  /* fling honours direction lock */
 },{passive:true});
 
 /* spring-chased P (critically damped) + rubber-band at the ends + beat magnetism.
@@ -577,11 +659,20 @@ function tick(){
   var dt=(tick._last==null)?0.016:Math.min(0.05,(now-tick._last)/1000); tick._last=now;
   if(REDUCED){ P=PT; Pv=0; }
   else {
-    /* beat magnetism: once input is quiet, ease PT onto the nearest resting point */
+    /* DIRECTIONAL beat magnetism (v6 WAVE A.2 item 1, NEVER MOVE BACKWARD): once
+       input is quiet, ease PT only onto the nearest resting point AT OR AHEAD of P
+       in the lastDir direction (a tiny epsilon behind counts as basically-there).
+       If no rest lies ahead, DO NOT MOVE: the board never settles backward. */
     if((now-lastInteract)>250){
-      var nearest=BEAT_RESTS[0], bestD=1e9;
-      for(var ri=0;ri<BEAT_RESTS.length;ri++){ var dj=Math.abs(BEAT_RESTS[ri]-PT); if(dj<bestD){ bestD=dj; nearest=BEAT_RESTS[ri]; } }
-      PT+=(nearest-PT)*Math.min(1,dt*2.2);
+      var target=null, bestD=1e9;
+      for(var ri=0;ri<BEAT_RESTS.length;ri++){
+        var r=BEAT_RESTS[ri];
+        var ahead=(lastDir>=0)?(r>=P-MAG_EPS):(r<=P+MAG_EPS);   /* only forward candidates */
+        if(!ahead) continue;
+        var dj=Math.abs(r-PT);
+        if(dj<bestD){ bestD=dj; target=r; }
+      }
+      if(target!=null) PT+=(target-PT)*Math.min(1,dt*2.2);      /* none ahead -> stay put */
     }
     var tgt=clamp(PT,-0.06,1.06);
     var accel=SPRING_K*(tgt-P)-SPRING_D*Pv;
@@ -719,6 +810,7 @@ var STEPS={
 };
 
 var answers=[];
+var flowStack=[];   /* v6 WAVE A.2 item 6: visited step keys, for the Back control */
 function melSay(txt){
   var c=$('melCap'); if(!c) return;
   if(!txt){ c.classList.remove('show'); return; }
@@ -726,7 +818,7 @@ function melSay(txt){
   c.classList.remove('show'); void c.offsetWidth; c.classList.add('show');
 }
 function openFlow(){
-  flowOpen=true; answers=[];
+  flowOpen=true; answers=[]; flowStack=['q1'];
   document.body.classList.add('flowMode');   /* the ring + rails clear out */
   $('flowScrim').classList.add('on');
   var fl=$('flow'); fl.classList.add('on'); fl.classList.add('approval');
@@ -734,8 +826,21 @@ function openFlow(){
   applyStoryboard();
   renderStep('q1');
 }
+/* step back one question, or on the first question close the flow to the
+   storyboard (existing closeFlow). Pops the last answer when leaving an
+   opts step so answers stay in sync with the stack. */
+function flowBack(){
+  if(flowStack.length<=1){ closeFlow(); return; }
+  /* every non-initial step was reached by one opts choice that pushed one answer;
+     stepping back undoes that choice, so drop its answer to stay in sync */
+  if(answers.length) answers.pop();
+  flowStack.pop();
+  renderStep(flowStack[flowStack.length-1]);
+}
 function closeFlow(){
-  flowOpen=false; PT=0.94; P=0.94; Pv=0; lastInteract=performance.now();
+  /* land on P=0.94; lastDir forward so directional magnetism settles onto the ask
+     rest 0.955 (not backward to the family beat) and never re-opens the flow */
+  flowOpen=false; PT=0.94; P=0.94; Pv=0; lastDir=1; reverseAccum=0; lastInteract=performance.now();
   parkForm(); melSay('');
   document.body.classList.remove('flowMode');
   $('flowScrim').classList.remove('on');
@@ -762,15 +867,24 @@ function renderStep(key){
   if(s.body) html+='<p>'+s.body+'</p>';
   if(s.opts){ html+='<div class="opts">'+s.opts.map(function(o,i){ return '<span class="opt" data-i="'+i+'">'+o.label+'</span>'; }).join('')+'</div>'; }
   if(s.capture){ html+='<div id="formSlot"></div>'; }
-  html+='<div class="backline"><span class="glow" id="backOrb">Back to the orb <span class="arw">&rsaquo;</span></span></div>';
+  /* item 6: a small glowing "Back" (letterspaced, dim, glowing text, no pill/box):
+     steps back to the previous question, or on the first question closes the flow.
+     Sits beside the existing "Back to the orb" full-exit affordance. Plain angle
+     character only (no em/en dashes). Kept OUTSIDE the native Webflow form so it
+     never interferes with submission; on the final access-form step it returns to
+     the last question. */
+  html+='<div class="backline"><span class="glow dim" id="flowBackBtn">&lsaquo; Back</span>'
+      + '<span class="glow" id="backOrb">Back to the orb <span class="arw">&rsaquo;</span></span></div>';
   step.innerHTML=html;
   if(s.capture) placeForm($('formSlot'));
+  var fb=$('flowBackBtn'); if(fb) fb.onclick=flowBack;
   var bo=$('backOrb'); if(bo) bo.onclick=closeFlow;
   if(s.opts){
     Array.prototype.forEach.call(step.querySelectorAll('.opt'),function(el){
       el.onclick=function(){
         var o=s.opts[+el.dataset.i];
         answers.push(s.q+' -> '+o.label);
+        flowStack.push(o.next);
         el.style.textShadow='0 0 16px rgba(94,255,160,1),0 0 34px rgba(46,230,111,.9)';
         setTimeout(function(){ renderStep(o.next); },240);
       };

@@ -574,6 +574,33 @@
   // ===========================================================================
   var flashLight = null;
   var breathLight = null; // short-range orb light — breath charges only the NEARBY glyph ring
+
+  // RADIALLY OUTWARD wall placement (v6 WAVE A.2 item 5, Eric law 11e). Position a
+  // PointLight on the NEAREST WALL along the ray from screen center THROUGH the
+  // node (nx, ny in 0..1), pushed just outside the node. Uses the same lateral
+  // mapping the lights used before (spread * aspect horizontally, spread
+  // vertically), so brightness/reach are unchanged; only the DIRECTION of the
+  // offset changes (was: sit on the node -> read as a 5 o'clock drop-shadow; now:
+  // slide out onto the wall radially outward: a left node lights 9 o'clock, an
+  // upper-right node 1 o'clock, a right node 3 o'clock). Writes straight into the
+  // light's position (no per-frame allocation). A dead-center node falls back to a
+  // tiny forward nudge so it still lights a patch.
+  var WALL_PUSH = 1.18; // push the dominant axis just past the wall extent, onto the wall
+  function placeRadialWall(light, nx, ny) {
+    var aspect = camera.aspect || 1.6;
+    var spread = 4.2;
+    var wallX = spread * aspect, wallY = spread;
+    // node position in the same camera-space mapping the old code used
+    var ax = ((nx < 0 ? 0 : (nx > 1 ? 1 : nx)) * 2 - 1) * wallX;
+    var ay = -((ny < 0 ? 0 : (ny > 1 ? 1 : ny)) * 2 - 1) * wallY;
+    // radial factor: scale the node vector so its dominant wall-normalized axis
+    // reaches the wall (then a little past), i.e. slide the pool OUTWARD to the wall
+    var m = Math.max(Math.abs(ax) / wallX, Math.abs(ay) / wallY);
+    if (m < 0.001) { light.position.set(0, -0.6, -9); return; } // dead-center: nudge, no /~0
+    var k = WALL_PUSH / m;
+    light.position.set(ax * k, ay * k, -9);
+  }
+
   window.corridorNodeFlash = function (nx, ny, strength) {
     if (!camera) return;
     if (!flashLight) {
@@ -582,10 +609,12 @@
       flashLight = new THREE.PointLight(CONFIG.GREEN, 0, 20, 2.0);
       camera.add(flashLight);
     }
-    var cx = Math.min(1, Math.max(0, nx || 0.5)) * 2 - 1;   // -1..1 across the window
-    var cy = Math.min(1, Math.max(0, ny || 0.5)) * 2 - 1;
-    var spread = 4.2;                                        // lateral reach toward the walls
-    flashLight.position.set(cx * spread * (camera.aspect || 1.6), -cy * spread, -9);
+    // RADIALLY OUTWARD (v6 WAVE A.2 item 5, Eric law 11e): the pool must land on
+    // the nearest wall point on the ray FROM screen center THROUGH the node, pushed
+    // out to the wall: a left node lights 9 o'clock, an upper-right node 1 o'clock,
+    // a right node 3 o'clock. Not a fixed below-right offset. Same camera-space
+    // mapping as before, but placed along the outward ray at the wall radius.
+    placeRadialWall(flashLight, nx, ny);
     // charge ACCUMULATES (never cuts a fading charge down) — repeated signals keep the walls fed
     flashLight.intensity = Math.max(flashLight.intensity || 0,
       CONFIG.NEAR_BRIGHTNESS * 3.0 * (strength || 1)); // ≈ +30% on the node's wall patch (×1.5 compensates the tight range)
@@ -625,11 +654,10 @@
       nodeBreathLights[idx] = pl;
     }
     if (level <= 0.001) { pl.intensity = 0; return; }
-    // map screen 0..1 -> camera-space lateral offset, same mapping as the flash light
-    var cx = (nx < 0 ? 0 : (nx > 1 ? 1 : nx)) * 2 - 1;
-    var cy = (ny < 0 ? 0 : (ny > 1 ? 1 : ny)) * 2 - 1;
-    var spread = 4.2;
-    pl.position.set(cx * spread * (camera.aspect || 1.6), -cy * spread, -9);
+    // RADIALLY OUTWARD (v6 WAVE A.2 item 5): place the pool on the wall along the
+    // center-to-node ray (shared placeRadialWall math with the flash light), so each
+    // node lights the nearest wall point outward from it, never a fixed offset.
+    placeRadialWall(pl, nx, ny);
     pl.intensity = CONFIG.NEAR_BRIGHTNESS * 1.6 * level; // soft, below the orb pool
   };
 
