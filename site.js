@@ -309,7 +309,7 @@ var SPRING_D=2*Math.sqrt(SPRING_K);         /* critical damping (~24.5) */
 var lastDir=1;                              /* sign of the most recent applied user input (+1 fwd, -1 back) */
 var reverseAccum=0;                         /* buffered opposite-direction intent (same units as PT delta) */
 var lastInputT=0;                           /* ms of the most recent raw input event (for reverse-buffer reset) */
-var WHEEL_STEP=0.075;                       /* a typical wheel-click normalized PT delta (~100px x 0.00075; the 140px cap is the max) */
+var WHEEL_STEP=0.13;                        /* a typical wheel-click normalized PT delta (~100px x 0.0013; the 140px cap is the max) */
 var REVERSE_WHEEL=2*WHEEL_STEP;             /* ~2 wheel clicks of opposite intent flips direction */
 var REVERSE_TOUCH_PX=40;                    /* ~40px deliberate opposite drag flips direction */
 var REVERSE_QUIET=600;                      /* ms of quiet resets the reverse buffer */
@@ -474,6 +474,22 @@ function orbDown(){
   orb.style.transform='translate(-50%,-50%)';
   layoutHub();
 }
+/* orb rise fraction 0..1: 0 at ring center (cy), 1 at the risen top anchor (0.17H).
+   Reads the orb's LIVE top so a mid-flight rise (reverse or fast-skip entry) gates
+   the page copy correctly regardless of travel direction. No per-frame allocation. */
+function orbRiseFrac(){
+  var orb=$('orb'); if(!orb||!stage) return orbIsUp?1:0;
+  var H=stage.clientHeight||1;
+  var topAnchor=H*0.17, centerY=H*0.5;
+  /* getBoundingClientRect reflects the LIVE, CSS-transition-animated position (the
+     inline style.top only holds the target), so we read the true mid-flight rise.
+     Center the measured rect vertically, then map center->0, top anchor->1. */
+  var r=orb.getBoundingClientRect();
+  var sr=stage.getBoundingClientRect();
+  var cur=(r.top+r.height*0.5)-sr.top;
+  var f=(centerY-cur)/(centerY-topAnchor);   /* center -> 0, top anchor -> 1 */
+  return f<0?0:(f>1?1:f);
+}
 
 function applyStoryboard(){
   var cs=cardState();
@@ -594,7 +610,16 @@ function renderPage(cs){
       +'</div>';
     pg.innerHTML=h;
   }
+  /* ORB-RISE GATE (board item 4): on ANY entry into a node page (including a reverse
+     from CFO back into CMO, or a fast key skip), the orb must reach the top anchor
+     BEFORE the body copy reveals, or the orb transiently parks mid-screen over the
+     copy. Gate the page opacity on the orb's measured rise toward the top anchor:
+     copy stays hidden until the orb is ~70% risen, then fades in. Runs in BOTH scroll
+     directions because it reads the orb's live position, not the travel direction. */
   var pv=smooth(0.30,0.62,cs.vis);
+  var rise=orbRiseFrac();
+  var riseGate=smooth(0.70,0.92,rise);   /* copy waits until the orb is ~70% risen */
+  pv*=riseGate;
   pg.style.opacity=pv.toFixed(3);
   var npc=pg.querySelector('.npc');
   if(npc) npc.style.transform='translateX(-50%) translateY('+((1-pv)*26).toFixed(1)+'px)';
@@ -615,11 +640,14 @@ window.addEventListener('wheel',function(e){
   if(e.deltaMode===1) d*=16;         /* lines -> px */
   else if(e.deltaMode===2) d*=400;   /* pages -> px */
   d=clamp(d,-140,140);               /* tame one violent trackpad kick */
-  driveBy(d*0.00075,REVERSE_WHEEL);  /* reverse buffer: opposite wheel needs ~2 clicks to flip */
+  driveBy(d*0.0013,REVERSE_WHEEL);   /* wheel gain +1.7x so a trackpad flick exits the hero as fast as keys; reverse buffer: opposite wheel needs ~2 clicks to flip */
 },{passive:false});
 
-/* keys: ~11 presses cover the board (was 0.032, far too small -> hero felt dead) */
-var KEY_STEP=1/11;
+/* keys: one press moves ~one card band. Card-zone rests are ~0.12 apart
+   (RING_REST 0.19 -> 0.31 -> 0.43 -> 0.55); KEY_STEP 0.10 lands just short of the
+   next rest and the strengthened forward magnetism catch pulls onto it, so a single
+   press reliably visits successive rests in order without skipping a whole band. */
+var KEY_STEP=0.10;
 window.addEventListener('keydown',function(e){
   if(e.key==='Escape'){ if(contactOpen) closeContact(); else if(flowOpen) closeFlow(); return; }
   if(flowOpen||contactOpen) return;
@@ -669,10 +697,15 @@ function tick(){
         var r=BEAT_RESTS[ri];
         var ahead=(lastDir>=0)?(r>=P-MAG_EPS):(r<=P+MAG_EPS);   /* only forward candidates */
         if(!ahead) continue;
-        var dj=Math.abs(r-PT);
+        /* FORWARD-CATCH (board item 2): prefer the nearest rest at or ahead of PT in
+           the travel direction, so a press that lands mid-band is pulled onto the NEXT
+           rest instead of drifting past it. Rests already behind PT get a penalty so a
+           just-overshot press still snaps to the rest it landed near, not the far one. */
+        var signed=(lastDir>=0)?(r-PT):(PT-r);   /* >=0 = ahead of PT in travel dir */
+        var dj=(signed>=-MAG_EPS)?Math.abs(r-PT):(Math.abs(r-PT)+1);
         if(dj<bestD){ bestD=dj; target=r; }
       }
-      if(target!=null) PT+=(target-PT)*Math.min(1,dt*2.2);      /* none ahead -> stay put */
+      if(target!=null) PT+=(target-PT)*Math.min(1,dt*3.2);      /* none ahead -> stay put */
     }
     var tgt=clamp(PT,-0.06,1.06);
     var accel=SPRING_K*(tgt-P)-SPRING_D*Pv;
@@ -723,7 +756,12 @@ function startNeuro(){
     var dt=Math.min(0.05,(now-_nLast)/1000); _nLast=now;
     var cx=W/2,cy=H/2;
     var blue=document.body.classList.contains('familyMode');
-    var lineCol=blue?'rgba(140,210,255,':'rgba(94,255,160,';
+    /* FAMILY RAY (board item 5): keep the blue identity signal but cut it hard so
+       GREEN stays the hero. Desaturate the family line toward a softer sky-blue and
+       carry a ~0.5x opacity multiplier on the persistent connector rays (the flip
+       flash is unchanged). famRay applies only to the steady lines, not the comet. */
+    var lineCol=blue?'rgba(120,175,220,':'rgba(94,255,160,';
+    var famRay=blue?0.5:1;
     NODES.forEach(function(a,i){
       if(a._lv==null) a._lv=0;
       a._lv+=((a._rv||0)-a._lv)*0.10;                 /* lines ease in and out */
@@ -735,7 +773,7 @@ function startNeuro(){
         return;
       }
       var gx=cx+(a._x-cx)*lineGrow, gy=cy+(a._y-cy)*lineGrow;
-      ctx.strokeStyle=lineCol+(0.30*lineGrow*a._lv).toFixed(3)+')'; ctx.lineWidth=1.3;
+      ctx.strokeStyle=lineCol+(0.30*lineGrow*a._lv*famRay).toFixed(3)+')'; ctx.lineWidth=1.3;
       ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(gx,gy); ctx.stroke();
 
       /* v6 SINGLE-PULSE comet cadence (Eric law 8): one discrete comet per node
@@ -782,8 +820,9 @@ function startNeuro(){
       var hx=cx+(a._x-cx)*ht, hy=cy+(a._y-cy)*ht, tx=cx+(a._x-cx)*tt, ty=cy+(a._y-cy)*tt;
       var env=pl.t<0.15?(pl.t/0.15):(pl.t>0.7?Math.max(0,(1-pl.t)/0.3):1);
       var grad=ctx.createLinearGradient(tx,ty,hx,hy);
-      grad.addColorStop(0,lineCol+'0)'); grad.addColorStop(1,blue?'rgba(215,240,255,.98)':'rgba(190,255,215,.98)');
-      ctx.globalAlpha=env*Math.max(elecOn,0.6); ctx.strokeStyle=grad; ctx.lineWidth=2.4; ctx.shadowBlur=11; ctx.shadowColor=lineCol+'.9)';
+      /* family comet head toned from bright blue-white to a softer sky-blue (board item 5) */
+      grad.addColorStop(0,lineCol+'0)'); grad.addColorStop(1,blue?'rgba(150,195,235,.66)':'rgba(190,255,215,.98)');
+      ctx.globalAlpha=env*Math.max(elecOn,0.6)*famRay; ctx.strokeStyle=grad; ctx.lineWidth=2.4; ctx.shadowBlur=11; ctx.shadowColor=lineCol+'.9)';
       ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(hx,hy); ctx.stroke(); ctx.globalAlpha=1;
     }
     ctx.shadowBlur=0;

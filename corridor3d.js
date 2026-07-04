@@ -585,18 +585,25 @@
   // upper-right node 1 o'clock, a right node 3 o'clock). Writes straight into the
   // light's position (no per-frame allocation). A dead-center node falls back to a
   // tiny forward nudge so it still lights a patch.
-  var WALL_PUSH = 1.18; // push the dominant axis just past the wall extent, onto the wall
+  var WALL_PUSH = 1.35; // push the dominant axis just past the wall extent, onto the wall
   function placeRadialWall(light, nx, ny) {
     var aspect = camera.aspect || 1.6;
-    var spread = 4.2;
+    // spread must reach the tunnel WALL (BASE_RADIUS ~12) at z=-9, or the pool lands
+    // mid-tube and reads as a central/down-biased footlight instead of on the wall.
+    // dominant-axis reach = spread * WALL_PUSH; 8.9 * 1.35 ~= 12, just past the wall.
+    var spread = 8.9;
     var wallX = spread * aspect, wallY = spread;
-    // node position in the same camera-space mapping the old code used
+    // SIGN MATH (board item 1 fix): screen ny=0 is TOP, ny=1 is BOTTOM; camera-space
+    // +y is UP (camera looks down -z, up ~ +y). The OUTWARD vertical must therefore be
+    // -(ny-0.5): a TOP node (ny<0.5) -> +y (pool ABOVE it, 12 o'clock), a BOTTOM node
+    // (ny>0.5) -> -y (pool below-and-outward). Expanding: -( (2*ny-1) )*wallY, which is
+    // exactly -2*(ny-0.5)*wallY. Horizontal: nx=0 is LEFT, +x is RIGHT, so +(2*nx-1).
     var ax = ((nx < 0 ? 0 : (nx > 1 ? 1 : nx)) * 2 - 1) * wallX;
     var ay = -((ny < 0 ? 0 : (ny > 1 ? 1 : ny)) * 2 - 1) * wallY;
     // radial factor: scale the node vector so its dominant wall-normalized axis
     // reaches the wall (then a little past), i.e. slide the pool OUTWARD to the wall
     var m = Math.max(Math.abs(ax) / wallX, Math.abs(ay) / wallY);
-    if (m < 0.001) { light.position.set(0, -0.6, -9); return; } // dead-center: nudge, no /~0
+    if (m < 0.001) { light.position.set(0, 0, -9); return; } // dead-center: no vertical bias, no /~0
     var k = WALL_PUSH / m;
     light.position.set(ax * k, ay * k, -9);
   }
