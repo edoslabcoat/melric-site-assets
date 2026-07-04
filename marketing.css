@@ -112,6 +112,8 @@ body.low-power #corridor{display:none}
   .glow,#hint,.mel-form input[type=submit]{animation:none}
   .orb::after{animation:none}
   .node,#hero,#phaseCap,#flow .step{transition-duration:.01s}
+  #melCap.live .eq i{animation:none}   /* caption bar: static waveform, words appear without lighting (site.js skips .live + the word timers) */
+  #melCap .vtxt .w{transition:none}
 }
 body.reduced .orb{background:radial-gradient(circle at 50% 45%,rgba(46,230,111,.35),rgba(46,230,111,.10) 40%,transparent 65%)}
 
@@ -250,14 +252,21 @@ body.familyMode .node.widget .wl.ok{color:#a8dcff}
 body.familyMode .node.widget.flare{border-color:rgba(160,220,255,.9);
   box-shadow:0 0 44px rgba(94,200,255,.6),inset 0 0 22px rgba(94,200,255,.22)}
 
-/* Melric's caption bar (top center), the app's caption language */
-#melCap{position:fixed;top:66px;left:50%;transform:translateX(-50%) translateY(-6px);z-index:12;max-width:min(560px,80vw);
-  text-align:center;padding:10px 20px;border-radius:12px;background:rgba(10,16,12,.72);border:1px solid rgba(94,255,160,.22);
-  backdrop-filter:blur(6px);font-size:14px;color:#dff5e6;letter-spacing:.02em;
-  text-shadow:0 0 8px rgba(46,230,111,.3);opacity:0;pointer-events:none;transition:opacity .45s,transform .45s}
-#melCap.show{opacity:1;transform:translateX(-50%) translateY(0)}
-#melCap::before{content:'MELRIC';display:block;font-size:9px;font-weight:800;letter-spacing:.34em;color:var(--accent);
-  text-shadow:0 0 10px rgba(46,230,111,.6);margin-bottom:4px}
+/* MELRIC's caption bar = the APP's voice bar. The .vbar / .vbar.show / .vbar .vtag /
+   .vbar .eq / .vbar .eq i / .vbar.live .eq i / @keyframes eqpulse / .vbar .vtxt rules
+   are ported VERBATIM from the app and already live in app.css (loaded first), so the
+   bar's look, backdrop, mask fade, and the animated green equalizer are identical to
+   the app with ZERO restyle here. #melCap just carries the .vbar class. The only site
+   addition is WORD-BY-WORD lighting inside .vtxt: words start dim and brighten to app
+   bright-white one at a time as MELRIC speaks. z-index bumped above the app's 80 is
+   unnecessary (topbar is z-index 9); the app bar sits top-center clear of the top-left
+   wordmark and top-right links. */
+#melCap{z-index:80}                              /* app default; keep it below nothing on the site */
+#melCap .vtxt .w{color:#4f7d63;transition:color .18s ease,text-shadow .18s ease}   /* upcoming: dim green-grey */
+#melCap .vtxt .w.on{color:#eafff4;text-shadow:0 0 10px rgba(94,255,160,.35)}       /* spoken: app bright white */
+@media (max-width:700px){
+  #melCap{max-width:92vw;padding:14px 34px}      /* narrow: the app's mask fade + 2-line clamp handle truncation */
+}
 
 /* the ask as an approval layer: orb rises, content sits beneath it */
 #flow.approval{align-items:flex-start;padding-top:31vh}
@@ -271,7 +280,6 @@ body.familyMode .node.widget.flare{border-color:rgba(160,220,255,.9);
   .node.widget .wl{font-size:11.5px}
   .node.widget .wl.big{font-size:16px}
   #modeTog{bottom:34px}
-  #melCap{top:58px;font-size:12.5px}
   #flow.approval{padding-top:27vh}
 }
 

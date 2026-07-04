@@ -193,9 +193,17 @@ function buildRing(){
   cc.id='cockCap';
   document.body.appendChild(cc);
   setRails('work');
-  /* MELRIC's caption bar (top): what MELRIC says during the approval */
+  /* MELRIC's caption bar (top center) = the APP's voice bar, ported verbatim
+     (structure + classes from app/renderer index.html .vbar; the .vbar/.eq/.vtag/.vtxt
+     CSS already ships verbatim in app.css, loaded first). One caption surface for the
+     whole site: the phase captions AND the ask-beat lines both route through it via
+     capSpeak(). Words inside #melCapTxt light up progressively as MELRIC speaks; the
+     equalizer bars animate while lighting and settle to idle when done. */
   var cap=document.createElement('div');
-  cap.id='melCap';
+  cap.className='vbar'; cap.id='melCap';
+  cap.innerHTML='<span class="vtag">MELRIC</span>'
+    +'<div class="eq"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>'
+    +'<div class="vtxt" id="melCapTxt"></div>';
   document.body.appendChild(cap);
   layoutHub(); placeKnob();
 }
@@ -364,6 +372,7 @@ function stepDuration(a,b){ var hi=Math.max(a,b); return DURATIONS[hi]||DUR_CARD
    the ask beat opens the qualifier flow instead of tweening past it. */
 function step(dir){
   if(tweenActive||flowOpen||contactOpen) return;
+  voiceUnlock();                            /* v6 voice: the first step gesture unlocks audio */
   var askIdx=BEAT_RESTS.length-2;           /* the ask rest (0.955) is second-to-last */
   /* forward off the ask beat -> open the flow (do not tween into the final rest) */
   if(dir>0 && beatIdx>=askIdx){ if(beatIdx===askIdx){ openFlow(); } return; }
@@ -374,6 +383,7 @@ function step(dir){
   if(REDUCED){
     P=PT=BEAT_RESTS[to]; _dPdt=0;
     arrivalTime=performance.now();          /* reduced arrival cascade is near-instant, clock still starts */
+    voiceOnArrival(to);                     /* v6 voice: reduced-motion still speaks the beat's line */
     return;
   }
   tweenActive=true;
@@ -400,6 +410,7 @@ function driveTween(nowMs,dtS){
     tweenActive=false;
     arrivalTime=nowMs;                      /* dwell + arrival cascade clock start */
     _dPdt=0;
+    voiceOnArrival(beatIdx);                /* v6 voice: speak this beat's line (silent if none) */
     return;
   }
   var t=raw<0?0:raw;
@@ -514,6 +525,62 @@ var CAPS=[
   {at:0.905,until:0.95,txt:'More time for your family. That is the point.'},
   {at:0.95,until:2,txt:'See if MELRIC fits your life.'}
 ];
+
+/* ============================================================================
+   CAPTION SPEAKING ENGINE (v6, Eric 2026-07-04). The app's caption bar shows one
+   line at a time; here MELRIC also SPEAKS it: each caption renders as word spans and
+   the words brighten sequentially (already-spoken words bright white, upcoming words
+   dim) at a natural reading pace, while the equalizer bars animate. When a real audio
+   line exists for the beat via the VOICE manifest, word pacing STRETCHES to the audio
+   duration; with no audio it uses the timed pace. One surface: CAPS phase lines and
+   the ask-beat lines both call capSpeak(). Reverse arrivals replay (capSpeak restarts).
+   Reduced-motion: words appear at once, equalizer static (no .live). ============= */
+var WORD_MS=265;                 /* per-word pace with no audio (natural read ~230-300ms) */
+var _capSeq=0;                   /* bumped on each new line so a stale timer never writes */
+var _capText='';                 /* the line currently mounted (skip redundant re-speaks) */
+var _capTimers=[];               /* pending word-light timers, cleared on a new line */
+function _capClearTimers(){ _capTimers.forEach(function(t){ clearTimeout(t); }); _capTimers=[]; }
+/* show/live helpers mirror the app's vbarShow / voiceActive(.live) */
+function capBarShow(on){ var c=$('melCap'); if(c) c.classList.toggle('show',!!on); }
+function capBarLive(on){ var c=$('melCap'); if(c) c.classList.toggle('live',!!on&&!REDUCED); }
+/* speak a caption: mount word spans, then light them one by one. audioEl (optional)
+   = an HTMLAudioElement already playing THIS beat's line; if present + it has a
+   finite duration, the words are distributed across audioEl.duration so the lighting
+   tracks the real voice. Otherwise a fixed WORD_MS pace is used. */
+function capSpeak(text,audioEl){
+  var txt=(text||'').replace(/\s+/g,' ').trim();
+  var box=$('melCapTxt'); if(!box) return;
+  if(!txt){ _capSeq++; _capClearTimers(); _capText=''; capBarLive(false); capBarShow(false); box.textContent=''; return; }
+  /* same line already mounted: keep it (do NOT restart the word lighting) UNLESS an
+     audio element arrived (audio pacing hook): then restart to stretch to its length. */
+  if(txt===_capText && box.querySelector('.w') && !audioEl) { capBarShow(true); return; }
+  _capText=txt;
+  var my=++_capSeq; _capClearTimers();
+  /* render word spans (dim by default; .on brightens). One trailing space per word
+     keeps natural spacing; the app bar clamps to 2 lines via .vtxt CSS. */
+  var words=txt.split(' ');
+  var _esc=function(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  box.innerHTML=words.map(function(w){ return '<span class="w">'+_esc(w)+'</span>'; }).join(' ');
+  var spans=box.querySelectorAll('.w');
+  capBarShow(true);
+  if(REDUCED){                                   /* reduced-motion: all lit at once, no waveform */
+    Array.prototype.forEach.call(spans,function(s){ s.classList.add('on'); });
+    capBarLive(false); return;
+  }
+  capBarLive(true);
+  /* pacing: stretch to the audio duration when a real line is playing, else fixed. */
+  var n=spans.length, dur=0;
+  if(audioEl){ var d=audioEl.duration; if(d&&isFinite(d)&&d>0) dur=d*1000; }
+  var step=dur? (dur/n) : WORD_MS;
+  step=Math.max(150,Math.min(360,step));         /* keep it readable even for long/short lines */
+  for(var k=0;k<n;k++){ (function(k){
+    _capTimers.push(setTimeout(function(){
+      if(my!==_capSeq) return;                   /* superseded by a newer line */
+      spans[k].classList.add('on');
+      if(k===n-1) _capTimers.push(setTimeout(function(){ if(my===_capSeq) capBarLive(false); },step)); /* settle idle */
+    }, step*k));
+  })(k); }
+}
 
 function cardState(){
   for(var i=0;i<CARD_BANDS.length;i++){
@@ -743,8 +810,21 @@ function applyStoryboard(){
   derezHeadline();   /* v6: per-letter de-rez of the H1 into the tunnel as the hero exits */
   var hint=$('hint'); if(hint) hint.style.opacity=(1-smooth(0.02,0.08,P)).toFixed(3);
 
+  /* PHASE CAPTIONS now route through the app caption bar (capSpeak): the words light
+     up as MELRIC speaks the line. The old #phaseCap text node is left blank/hidden;
+     the caption bar owns the surface. Show only when a line is active, no overlay is
+     open, and we are not deep inside a node page (matches the prior visibility gate). */
   var cap=''; CAPS.forEach(function(c){ if(P>=c.at&&P<c.until) cap=c.txt; });
-  var pc=$('phaseCap'); if(pc){ pc.textContent=cap; pc.style.opacity=(cap&&!flowOpen&&!contactOpen&&(!cs||cs.vis<0.2))?1:0; }
+  var pc=$('phaseCap'); if(pc){ pc.textContent=''; pc.style.opacity=0; }
+  if(!flowOpen && !contactOpen){                 /* the ask/contact own the bar while open */
+    var capVisible=(cap && (!cs||cs.vis<0.2));
+    /* a beat line MELRIC is speaking owns the bar until the next beat replaces it;
+       the CAPS gate must not clear it (BEAT_LINES render inside card pages where
+       the old visibility gate would otherwise wipe the bar every frame). */
+    var beatLineActive=(typeof BEAT_LINES!=='undefined') && _capText && _capText===BEAT_LINES[beatIdx];
+    if(capVisible) capSpeak(cap);
+    else if(_capText && !beatLineActive){ capSpeak(''); } /* line ended / scrubbed away: clear + hide */
+  }
 
   renderPage(cs);
 
@@ -900,6 +980,27 @@ function stepTo(idx){
   tweenStart=performance.now(); tweenDur=stepDuration(from,idx);
 }
 
+/* ---- ORB CLICK = HOME (v6, Eric 2026-07-04). Clicking the MELRIC orb anywhere in
+   the experience returns to the beginning: a SINGLE smooth tween from the current P
+   back to beat 0 (same easeInOutQuart via driveTween), landing at the hero as a
+   normal arrival that re-arms the stepper. If the qualifier flow or contact panel is
+   open, close it first (existing closeFlow/closeContact), THEN go home. Ignored while
+   a tween is already playing (ignoring is fine per spec) so it can never double-fire
+   or fight the active transition. ---- */
+var HOME_DUR=1600;                          /* ms: the orb -> beat 0 homeward tween */
+function goHome(){
+  /* close any open layer first; those calls land P/beatIdx back on the ask rest and
+     re-arm the stepper, from which we then tween home. */
+  if(contactOpen) closeContact();
+  if(flowOpen) closeFlow();
+  if(tweenActive) return;                   /* already moving: ignore (no queue needed) */
+  if(beatIdx===0 && P<=BEAT_RESTS[0]+1e-4) return;  /* already home */
+  var from=beatIdx; beatIdx=0;
+  if(REDUCED){ P=PT=BEAT_RESTS[0]; _dPdt=0; arrivalTime=performance.now(); return; }
+  tweenActive=true; tweenFrom=P; tweenTo=BEAT_RESTS[0];
+  tweenStart=performance.now(); tweenDur=HOME_DUR;  /* one smooth ~1.6s glide home */
+}
+
 /* ---- tick (STEP MODEL): P is owned entirely by the active tween; at rest P is
    pinned to the current beat's rest. No spring, no magnetism, no rubber-band.
    Reduced-motion never tweens (step()/stepTo() snap P directly). ---- */
@@ -1044,11 +1145,11 @@ var STEPS={
 
 var answers=[];
 var flowStack=[];   /* v6 WAVE A.2 item 6: visited step keys, for the Back control */
+/* the ask-beat conversational captions route through the SAME caption bar as the
+   phase captions (one surface). capSpeak('') clears + hides it. */
 function melSay(txt){
-  var c=$('melCap'); if(!c) return;
-  if(!txt){ c.classList.remove('show'); return; }
-  c.textContent=txt;
-  c.classList.remove('show'); void c.offsetWidth; c.classList.add('show');
+  if(!txt){ capSpeak(''); return; }
+  capSpeak(txt);
 }
 function openFlow(){
   /* STEP MODEL: the flow is entered FROM the ask beat (either a forward step off
@@ -1158,6 +1259,93 @@ function boot3d(){
   } else setTimeout(boot3d,90);
 }
 
+/* ============================================================================
+   VOICE LAYER (v6 silent skeleton, Eric 2026-07-04). MELRIC speaks one short line
+   on arrival at key beats. Audio files land later; every manifest entry may be null
+   for now and the layer stays silent + error-free. OFF by default, topbar toggle.
+   Laws: only plays after the FIRST user gesture (autoplay compliance), never
+   overlaps (stops the previous line), catches 404/null silently, independent of
+   reduced-motion (voice is not motion).
+   ============================================================================ */
+/* base URL for voice files, derived from THIS script's own src so the jsDelivr pin
+   always matches the loaded bundle (…/melric-site-assets@<pin>/site.js -> same dir).
+   Falls back to the current pin if the src cannot be read. */
+var VOICE_BASE=(function(){
+  try{
+    var s=document.currentScript||(function(){ var a=document.getElementsByTagName('script');
+      for(var i=a.length-1;i>=0;i--){ if(/site\.js(\?|$)/.test(a[i].src)) return a[i]; } return null; })();
+    if(s&&s.src) return s.src.replace(/site\.js(\?.*)?$/,'');   /* strip filename, keep dir + pin */
+  }catch(e){}
+  return 'https://cdn.jsdelivr.net/gh/edoslabcoat/melric-site-assets@80bcf40/';
+})();
+/* beat index -> voice file (repo root, same pin pattern). ALL null for now: shipping
+   silent is safe. Fill an entry (e.g. 2:'voice-cmo.mp3') when the audio lands. */
+var VOICE={ 0:null, 1:null, 2:null, 3:null, 4:null, 5:null, 6:null, 7:null, 8:null };
+var voiceOn=false;              /* OFF by default (choice held in this JS var only, no storage) */
+var voiceUnlocked=false;        /* flips true on the first user gesture (autoplay policy) */
+var voiceAudio=null;            /* the single reused HTMLAudioElement (never overlaps) */
+/* the first step gesture unlocks playback: a muted no-op play()/pause primes the
+   element so later real plays are allowed. Safe to call repeatedly. */
+function voiceUnlock(){
+  if(voiceUnlocked) return; voiceUnlocked=true;
+  try{ if(!voiceAudio) voiceAudio=new Audio(); voiceAudio.muted=true;
+    var p=voiceAudio.play(); if(p&&p.catch) p.catch(function(){}); voiceAudio.pause();
+    voiceAudio.muted=false; }catch(e){}
+}
+/* play the line for a beat, if any: OFF/locked/null -> silent; stops any prior line
+   first so nothing ever overlaps; a null entry or a 404 is caught and ignored. */
+function voicePlay(idx){
+  if(!voiceOn||!voiceUnlocked) return;
+  var file=VOICE[idx]; if(!file) return;                 /* no line for this beat */
+  try{
+    if(!voiceAudio) voiceAudio=new Audio();
+    voiceAudio.pause(); try{ voiceAudio.currentTime=0; }catch(e){}   /* stop the previous line */
+    voiceAudio.src=VOICE_BASE+file;
+    /* AUDIO PACING HOOK: once the file's duration is known, re-drive the currently
+       shown caption so its words light across the REAL voice length instead of the
+       timed pace. Only if the shown line is still the one being spoken (guard by
+       _capText being non-empty; capSpeak restarts the word timers cleanly). */
+    voiceAudio.onloadedmetadata=function(){ if(_capText) capSpeak(_capText,voiceAudio); };
+    var pr=voiceAudio.play(); if(pr&&pr.catch) pr.catch(function(){});  /* 404/decode: silent */
+  }catch(e){}
+}
+/* on arrival at a beat (called after ARRIVAL_DELAY_MS from the arrival hook), speak
+   that beat's line. Guarded so a rapid re-arrival replaces cleanly (voicePlay stops
+   the prior line). Reduced-motion still fires this (voice is independent of motion). */
+/* MELRIC's spoken line per beat (Eric-approved placeholders 2026-07-04; final copy
+   comes with his one-shot copy pass). Card beats 2-4, cockpit 5, family 6. Hero 0 and
+   ring 1 keep the narrative CAPS; the ask beat 7 keeps its own conversational melSay
+   lines. These render word-by-word through the app-true caption bar, and stretch to
+   the real ElevenLabs audio automatically once the VOICE manifest files exist. */
+var BEAT_LINES={
+  2:'I am your Chief Marketing Officer. I run your content and double down on what wins.',
+  3:'I am your Chief Financial Officer. Every dollar tracked, and I suggest the next money move daily.',
+  4:'I am your Chief Operating Officer. Nothing slips, ever.',
+  5:'This is your cockpit. Your whole operation, one glance.',
+  6:'And when work ends, I run your home too.'
+};
+function voiceOnArrival(idx){ setTimeout(function(){
+  if(beatIdx!==idx) return;
+  if(BEAT_LINES[idx] && !flowOpen && !contactOpen) capSpeak(BEAT_LINES[idx]);
+  voicePlay(idx);
+},ARRIVAL_DELAY_MS); }
+/* build the topbar toggle: letterspaced dim glow text next to the existing items, no
+   pill/box. "SOUND ›" when off, "SOUND OFF" when on. Injected into .tb-right so no
+   separate Webflow embed republish is needed. */
+function buildVoice(){
+  var right=document.querySelector('.topbar .tb-right'); if(!right) return;
+  var t=document.createElement('span');
+  t.id='voiceToggle'; t.className='glow dim';
+  t.innerHTML='SOUND <span class="arw">&rsaquo;</span>';
+  t.onclick=function(){
+    voiceUnlock();                                       /* clicking the toggle also counts as a gesture */
+    voiceOn=!voiceOn;
+    t.innerHTML=voiceOn?'SOUND OFF':'SOUND <span class="arw">&rsaquo;</span>';
+    if(!voiceOn&&voiceAudio){ try{ voiceAudio.pause(); }catch(e){} }  /* turning off silences any line */
+  };
+  right.insertBefore(t,right.firstChild);                /* sits before Log in / Contact / Request access */
+}
+
 window.addEventListener('load',function(){
   buildRing();
   buildHeadline();   /* v6: wrap the H1 into per-letter spans for the de-rez */
@@ -1171,6 +1359,11 @@ window.addEventListener('load',function(){
   var ca=$('ctaAccess'); if(ca) ca.onclick=function(){ openFlow(); };
   var cc=$('ctaContact'); if(cc) cc.onclick=function(){ openContact(); };
   var cb=$('contactBack'); if(cb) cb.onclick=closeContact;
+  /* ORB CLICK = HOME (v6): make the orb read + behave as pressable (the 3D #orbCanvas
+     inside it is pointer-events:none, so clicks land on the .orb host and never break
+     anything layered over it). Clicking anywhere in the experience glides back to beat 0. */
+  var orbEl=$('orb'); if(orbEl){ orbEl.style.cursor='pointer'; orbEl.style.pointerEvents='auto'; orbEl.onclick=goHome; }
+  buildVoice();   /* v6: silent-by-default voice layer (see below) */
 });
 window.addEventListener('resize',function(){ layoutHub(); placeKnob(); applyStoryboard(); });
 

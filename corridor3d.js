@@ -52,6 +52,21 @@
     NEAR_BRIGHTNESS: 14.5, // site v3: lifted from 12.4 // gentle near-brightness; the light no longer defines the reach (fog does), so this just sets LIT digit brightness. +10% to brighten lit digits — fog still takes the deep ones to the same black, so the dark parts are unchanged.
     BREATH_PERIOD: 3.6,    // seconds — matches Melric's orb breathing so the digits pulse in sync
     EMISSIVE_BREATH: 0.11, // SMALL — a big emissive swing slides the fog/visibility threshold forward & back, and that moving threshold reads as a tube-shaped hard line sweeping in the tunnel. Tiny swing = gentle shimmer, not a moving boundary.
+
+    // --- PHOSPHORESCENT CHARGE model (v6, Eric 2026-07-04) ---------------------
+    // Eric: "the nodes should gently be lighting up the 1s and 0s, as if the nodes
+    // and MELRIC make them radioactive for a time; they glow in the dark then
+    // slowly return to normal; subtle." The wall lights no longer FLASH. Each light
+    // holds a charge accumulator: it rises only as fast as its source's breath
+    // (never a sharp onset), then decays SLOWLY (exponential, ~2.2-3s) so the digits
+    // stay lit after the breath peak and fade back gently. Peak intensities cut to
+    // ~40-50% of the old flash values so it reads as glowing GLYPHS, not a lit wall.
+    CHARGE_DECAY_TAU: 2.6,     // s: exponential decay time constant of the wall charge (glow-in-the-dark tail)
+    CHARGE_ATTACK_MIN_S: 0.42, // s: a charge jump (bloom/ignition) ramps over at LEAST this long, so no instant flash anywhere (>=400ms)
+    ORB_BREATH_MUL: 2.5,       // was 5.5: orb-breath wall light peak cut to ~45% (glyphs glow, wall is not lit)
+    NODE_BREATH_MUL: 0.75,     // was 1.6: per-node breath wall pool peak cut to ~47%
+    NODE_FLASH_MUL: 1.4,       // was 3.0: node-ignition charge target cut to ~47%, and now RAMPED not snapped
+    WALL_RANGE_MUL: 0.85,      // reduce every wall-light range ~15% so the pool hugs fewer glyphs
     FAR_DIM: 0.18,   // site v3: lifted from 0.12          // zero ambient — anything deeper than the viewer's plane (behind Melric) goes pure black
     FOG_NEAR: 9.0,         // lit only right at the foreground / viewer's plane
     FOG_FAR: 28.0,         // (unused with exponential fog below — kept for reference)
@@ -539,16 +554,33 @@
     // (~27 units away) is mathematically beyond reach. Inverse-square-ish decay 2, tangent-
     // smooth at zero — the deep dark atmosphere cannot change.
     if (!breathLight) {
-      breathLight = new THREE.PointLight(CONFIG.GREEN, 0, 17.5, 2.0);
+      // range trimmed ~15% (WALL_RANGE_MUL) so the pool hugs fewer glyphs (17.5 -> ~14.9).
+      breathLight = new THREE.PointLight(CONFIG.GREEN, 0, 17.5 * CONFIG.WALL_RANGE_MUL, 2.0);
       breathLight.position.set(0, 0, -9); // sits at Melric's spot in the scene
       camera.add(breathLight);
     }
-    breathLight.intensity = CONFIG.NEAR_BRIGHTNESS * 5.5 * _breath; // ≈ +30% on Melric's wall ring at peak (×3.1 compensates the tight-range falloff)
-    if (glyphMaterial) glyphMaterial.emissiveIntensity = CONFIG.EMISSIVE_INTENSITY + CONFIG.EMISSIVE_BREATH * _breath;
-    // Node-flash bounce light: the glyphs "gain power" from the node and it slowly WEARS OFF
-    // (Eric) — gentle exponential drain, ~3s back to dark. The UI flare cools faster; the wall
-    // charge lingers behind it like an afterglow.
-    if (flashLight && flashLight.intensity > 0.02) flashLight.intensity *= Math.exp(-dt * 1.15);
+    // PHOSPHORESCENT CHARGE (v6): the orb-breath wall light no longer tracks the breath
+    // 1:1 (that read as a flash washing the wall). Its charge RISES with the breath
+    // (attack tied to the breath phase, never faster) and DECAYS slowly (~2.6s tau) so
+    // the glyphs stay lit past the peak and fade back gently. Peak cut to ~45% (ORB_BREATH_MUL).
+    var _breathTarget = CONFIG.NEAR_BRIGHTNESS * CONFIG.ORB_BREATH_MUL * _breath;
+    if (_breathTarget >= _breathCharge) _breathCharge = _breathTarget;           // rise WITH the breath (smooth, no snap)
+    else _breathCharge *= Math.exp(-dt / CONFIG.CHARGE_DECAY_TAU);               // slow radioactive fade
+    breathLight.intensity = _breathCharge;
+    if (glyphMaterial) glyphMaterial.emissiveIntensity = CONFIG.EMISSIVE_INTENSITY + CONFIG.EMISSIVE_BREATH * _breath; // ambient shimmer kept
+    // Node-ignition charge (bloom/flash): ATTACK ramps toward its target over >=CHARGE_ATTACK_MIN_S
+    // (no instant jump anywhere), then the same slow radioactive decay carries the afterglow. The
+    // target is set by corridorNodeFlash; here we ease intensity toward it and bleed the target down.
+    if (flashLight) {
+      if (_flashTarget > flashLight.intensity) {
+        // ramp up over >=CHARGE_ATTACK_MIN_S: approach the target, never snap to it
+        flashLight.intensity += (_flashTarget - flashLight.intensity) * Math.min(1, dt / CONFIG.CHARGE_ATTACK_MIN_S);
+      } else {
+        flashLight.intensity *= Math.exp(-dt / CONFIG.CHARGE_DECAY_TAU);          // slow ~2.6s glow-in-the-dark tail
+      }
+      _flashTarget *= Math.exp(-dt / CONFIG.CHARGE_DECAY_TAU);                    // the target itself decays so the ramp doesn't hold a plateau
+      if (flashLight.intensity < 0.02 && _flashTarget < 0.02) { flashLight.intensity = 0; _flashTarget = 0; }
+    }
     renderer.render(scene, camera);
   }
 
@@ -574,6 +606,11 @@
   // ===========================================================================
   var flashLight = null;
   var breathLight = null; // short-range orb light — breath charges only the NEARBY glyph ring
+  // PHOSPHORESCENT CHARGE accumulators (v6, Eric 2026-07-04): these hold the slowly-
+  // decaying "radioactive" glow so the wall stays lit after a breath peak / node
+  // ignition and fades back gently, instead of flashing. See CONFIG.CHARGE_* block.
+  var _breathCharge = 0; // orb-breath wall charge (rises with breath, decays ~2.6s)
+  var _flashTarget = 0;  // node-ignition charge target; flashLight.intensity RAMPS toward it (>=420ms), never snaps
 
   // RADIALLY OUTWARD wall placement (v6 WAVE A.2 item 5, Eric law 11e). Position a
   // PointLight on the NEAREST WALL along the ray from screen center THROUGH the
@@ -613,7 +650,8 @@
     if (!flashLight) {
       // SAME PHYSICS as the breath light (Eric): tight range — a node's flash lights the wall
       // patch around the node's own plane, never the deeper tunnel. decay 2 = inverse-square feel.
-      flashLight = new THREE.PointLight(CONFIG.GREEN, 0, 20, 2.0);
+      // range trimmed ~15% (WALL_RANGE_MUL) so the pool hugs fewer glyphs (20 -> ~17).
+      flashLight = new THREE.PointLight(CONFIG.GREEN, 0, 20 * CONFIG.WALL_RANGE_MUL, 2.0);
       camera.add(flashLight);
     }
     // RADIALLY OUTWARD (v6 WAVE A.2 item 5, Eric law 11e): the pool must land on
@@ -622,9 +660,13 @@
     // a right node 3 o'clock. Not a fixed below-right offset. Same camera-space
     // mapping as before, but placed along the outward ray at the wall radius.
     placeRadialWall(flashLight, nx, ny);
-    // charge ACCUMULATES (never cuts a fading charge down) — repeated signals keep the walls fed
-    flashLight.intensity = Math.max(flashLight.intensity || 0,
-      CONFIG.NEAR_BRIGHTNESS * 3.0 * (strength || 1)); // ≈ +30% on the node's wall patch (×1.5 compensates the tight range)
+    // PHOSPHORESCENT (v6): DO NOT snap the intensity. Raise the charge TARGET; the animate
+    // loop ramps flashLight.intensity toward it over >=CHARGE_ATTACK_MIN_S (no instant flash)
+    // and then lets it decay slowly (~2.6s) so the glyphs glow-in-the-dark and fade back.
+    // Charge ACCUMULATES (Math.max) so repeated ignitions keep the wall fed, never cut it down.
+    // Peak cut to ~47% (NODE_FLASH_MUL) so it reads as glyphs glowing, not a lit wall.
+    _flashTarget = Math.max(_flashTarget,
+      CONFIG.NEAR_BRIGHTNESS * CONFIG.NODE_FLASH_MUL * (strength || 1));
   };
 
   // ===========================================================================
@@ -651,21 +693,36 @@
   // ===========================================================================
   var REDUCED_C = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   var nodeBreathLights = [];
+  var nodeBreathCharge = []; // per-node phosphorescent charge (rises with breath, decays ~2.6s)
+  var nodeBreathT = [];      // per-node last-call time (s) so we can decay on a real dt without a dt arg
   window.corridorSetNodeLight = function (idx, nx, ny, level) {
     if (!camera || REDUCED_C) return;
     var pl = nodeBreathLights[idx];
     if (!pl) {
-      // range 11 (per spec): reaches the near wall ring on this plane only.
-      pl = new THREE.PointLight(CONFIG.GREEN, 0, 11.0, 2.0);
+      // range 11 (per spec) trimmed ~15% (WALL_RANGE_MUL) so the pool hugs fewer glyphs.
+      pl = new THREE.PointLight(CONFIG.GREEN, 0, 11.0 * CONFIG.WALL_RANGE_MUL, 2.0);
       camera.add(pl);
       nodeBreathLights[idx] = pl;
+      nodeBreathCharge[idx] = 0;
     }
-    if (level <= 0.001) { pl.intensity = 0; return; }
+    // PHOSPHORESCENT CHARGE (v6): the node pool no longer tracks `level` 1:1 (which let the
+    // arrival bloom snap in as a flash). Its charge RISES toward the breath/bloom target no
+    // faster than CHARGE_ATTACK_MIN_S (so even a bloom that snaps to 1 ramps over >=420ms),
+    // then DECAYS slowly (~2.6s) so the glyphs stay lit after the peak and fade back gently.
+    var nowS = clock ? clock.elapsedTime : 0;
+    var lastS = nodeBreathT[idx]; var dtS = (lastS == null) ? 0.016 : (nowS - lastS);
+    if (dtS < 0) dtS = 0.016; if (dtS > 0.1) dtS = 0.1; nodeBreathT[idx] = nowS;
+    var target = CONFIG.NEAR_BRIGHTNESS * CONFIG.NODE_BREATH_MUL * (level < 0 ? 0 : level);
+    var ch = nodeBreathCharge[idx] || 0;
+    if (target > ch) ch += (target - ch) * Math.min(1, dtS / CONFIG.CHARGE_ATTACK_MIN_S); // ramp up, no snap
+    else ch *= Math.exp(-dtS / CONFIG.CHARGE_DECAY_TAU);                                    // slow radioactive fade
+    nodeBreathCharge[idx] = ch;
+    if (ch <= 0.002) { pl.intensity = 0; return; }
     // RADIALLY OUTWARD (v6 WAVE A.2 item 5): place the pool on the wall along the
     // center-to-node ray (shared placeRadialWall math with the flash light), so each
     // node lights the nearest wall point outward from it, never a fixed offset.
     placeRadialWall(pl, nx, ny);
-    pl.intensity = CONFIG.NEAR_BRIGHTNESS * 1.6 * level; // soft, below the orb pool
+    pl.intensity = ch; // soft, below the orb pool
   };
 
   // ===========================================================================
