@@ -341,9 +341,12 @@ var DURATIONS=[0, DUR_HERO_RING, DUR_RING_CMO, DUR_CARD, DUR_CARD, DUR_COO_COCKP
    drivers read so lines/rails cascade in one at a time on a TIME basis, not a
    P-band. Reverse entry replays cleanly because the clock restarts on every
    arrival. --- */
-var LINE_STAGGER_MS=320;                    /* each copy line arrives this long after the previous */
-var LINE_FADE_MS=360;                       /* a single line's blur-to-clear fade duration */
+var LINE_STAGGER_MS=450;                    /* each copy line arrives this long after the previous (Eric: slightly slower) */
+var LINE_FADE_MS=450;                       /* a single line's blur-to-clear fade duration */
+var ARRIVAL_DELAY_MS=350;                   /* beat of stillness after landing before the FIRST element cascades (Eric: none, then one at a time) */
 var RAIL_LEAD_MS=360;                       /* rails/count-ups begin this long after the last copy line */
+var NODE_STAGGER_MS=300;                    /* cockpit/family: each widget node emerges this long after the previous (one by one) */
+var NODE_RAIL_LEAD_MS=340;                  /* cockpit/family: corner rails begin this long after the LAST widget node lands */
 var REDUCED_ARRIVAL_MS=120;                 /* reduced-motion: whole cascade compressed to <=120ms */
 
 /* is the input channel armed for a fresh step? (not tweening, dwell elapsed,
@@ -416,7 +419,34 @@ function arrivalLine(k){
   if(tweenActive) return 0;
   var el=performance.now()-arrivalTime;
   if(REDUCED){ return el>=REDUCED_ARRIVAL_MS?1:clamp(el/REDUCED_ARRIVAL_MS,0,1); }
-  var start=k*LINE_STAGGER_MS;
+  var start=ARRIVAL_DELAY_MS+k*LINE_STAGGER_MS;
+  return clamp((el-start)/LINE_FADE_MS,0,1);
+}
+/* COCKPIT / FAMILY WIDGET-NODE CASCADE (step model): the 6 widget nodes emerge ONE
+   BY ONE on the arrival clock when the tween lands on the cockpit (idx 5) or family
+   (idx 6) beat, node k arriving NODE_STAGGER_MS after node k-1, each fading in over
+   LINE_FADE_MS (its existing green-breath appearance rides on top via the neuro pulse
+   + wall pool, law 8b). While a tween is still playing this returns 0 so the ring is
+   NOT pre-built mid-transition; the visible emergence is arrival-driven. Reverse entry
+   (family -> cockpit, or a scrub back onto the beat) replays because arrivalTime
+   restarts on every arrival. Reduced-motion compresses to REDUCED_ARRIVAL_MS. */
+function arrivalNode(k){
+  if(tweenActive) return 0;
+  var el=performance.now()-arrivalTime;
+  if(REDUCED){ return el>=REDUCED_ARRIVAL_MS?1:clamp(el/REDUCED_ARRIVAL_MS,0,1); }
+  var start=ARRIVAL_DELAY_MS+k*NODE_STAGGER_MS;
+  return clamp((el-start)/LINE_FADE_MS,0,1);
+}
+/* progress of the corner rails on the cockpit/family beat, cascading AFTER the last
+   widget node has landed (so nodes finish forming, THEN the rails come in). */
+function arrivalCockRail(ci){
+  if(tweenActive) return 0;
+  var el=performance.now()-arrivalTime;
+  if(REDUCED){ return el>=REDUCED_ARRIVAL_MS?1:clamp(el/REDUCED_ARRIVAL_MS,0,1); }
+  /* NODES.length-MAIN widget nodes cascade first (k=0..that-1); the last one starts at
+     (count-1)*NODE_STAGGER_MS and fades over LINE_FADE_MS, so rails lead off after it. */
+  var lastNodeDone=ARRIVAL_DELAY_MS+(NODES.length-MAIN-1)*NODE_STAGGER_MS+LINE_FADE_MS;
+  var start=lastNodeDone+NODE_RAIL_LEAD_MS+ci*LINE_STAGGER_MS;
   return clamp((el-start)/LINE_FADE_MS,0,1);
 }
 /* progress of the rails / count-ups, which begin RAIL_LEAD_MS after the LAST of
@@ -465,13 +495,15 @@ function inCardZone(){ return P>=ZONE_IN && P<=ZONE_OUT; }
    nearest resting point AHEAD in the travel direction (never behind). Order:
    hero, RING beat, CMO page, CFO page, COO page, work cockpit, family cockpit,
    the ask, final. (RING rest 0.19 is the new clear C-suite ring beat. CARD_BANDS
-   centers: 0.31 / 0.43 / 0.55; cockpit settles after ghost ring-in ~0.65..0.82
-   -> 0.76; family after FLIP 0.83 before the ask captions -> 0.84; the ask before
+   centers: 0.31 / 0.43 / 0.55; cockpit rests PAST the ghost ring-in band end
+   (~0.65..0.82) at 0.80 so the resting P-state is a FULLY-built ring, and clear of
+   the FLIP at 0.83 (the arrival cascade owns the node emergence, not the P band);
+   family after FLIP 0.83 before the ask captions -> 0.84; the ask before
    openFlow at 0.968 -> 0.955. Final rest 0.978 (board fix D5, CEO call): idling
    past the 0.9665 midpoint glides INTO the qualifier flow so the journey cannot
    dead-end one notch short of the form; closeFlow resets P to 0.94 whose nearest
    forward rest is 0.955, so closing never re-opens it.) */
-var BEAT_RESTS=[0, RING_REST, 0.31, 0.43, 0.55, 0.76, 0.84, 0.955, 0.978];
+var BEAT_RESTS=[0, RING_REST, 0.31, 0.43, 0.55, 0.80, 0.84, 0.955, 0.978];
 
 var CAPS=[
   {at:0.115,until:0.25,txt:'You just hired your C-suite.'},
@@ -632,16 +664,20 @@ function applyStoryboard(){
      (idx 5) or the family beat (idx 6) the four corner rails type on staggered on
      the arrival clock (rail swap cascade). max(P-based, arrival) so a fast scrub
      still shows them and a reverse entry replays the cascade cleanly. */
-  var railCascade=!(flowOpen||contactOpen) && !tweenActive && (beatIdx===5||beatIdx===6);
+  /* is the board resting on (or tweening toward) the cockpit/family beat? These two
+     beats own the widget-node + corner-rail ARRIVAL cascade (nodes one by one, then
+     rails). onCockFam gates the P-driven ghost ring-in so the ring is NOT pre-built
+     during the dissolve/travel; the visible emergence is arrival-driven at landing. */
+  var onCockFam=(beatIdx===5||beatIdx===6) && !flowOpen && !contactOpen;
+  var railCascade=onCockFam && !tweenActive;
   ['railTL','railTR','railBL','railBR'].forEach(function(id,ci){
     var r=$(id); if(!r) return;
     var op=railOp;
     if(railCascade){
-      /* stagger corners by LINE_STAGGER_MS so the four rails cascade, not pop */
-      var el=performance.now()-arrivalTime;
-      var span=REDUCED?REDUCED_ARRIVAL_MS:LINE_FADE_MS;
-      var start=REDUCED?0:ci*LINE_STAGGER_MS;
-      op=Math.max(railOp, clamp((el-start)/span,0,1));
+      /* corner rails cascade AFTER the last widget node lands (arrivalCockRail) so the
+         ring finishes forming, THEN the rails come in. Arrival-owned (no railOp floor:
+         it pre-lit the rails at the resting P). Reverse/scrub replays cleanly. */
+      op=arrivalCockRail(ci);
     }
     r.style.opacity=op.toFixed(3);
   });
@@ -655,8 +691,20 @@ function applyStoryboard(){
          ring beat (rest 0.19) shows a complete, breathing C-suite ring */
       var s=0.045+i*0.03; rv=smooth(s,s+0.045,P)*(1-dis);
     } else {
-      var gs=GHOST_START+gi*0.024; gi++;
-      rv=smooth(gs,gs+0.05,P);
+      var k=gi; gi++;
+      if(onCockFam){
+        /* ARRIVAL-DRIVEN emergence: on the cockpit/family beat the 6 widget nodes come
+           out ONE BY ONE off the arrival clock. During the tween arrivalNode() returns 0
+           (tweenActive), so the ring is NOT pre-built mid-transition; the nodes only
+           emerge after the tween lands. At rest arrivalNode owns rv (we do NOT max it
+           with the P band, which would be fully lit at these P values and defeat the
+           cascade). Reverse entry (family -> cockpit) replays: arrivalTime restarts. */
+        rv=arrivalNode(k);
+      } else {
+        /* elsewhere (fast scrub through the region, the ask rest): the original P band */
+        var gs=GHOST_START+k*0.024;
+        rv=smooth(gs,gs+0.05,P);
+      }
     }
     /* pulse announces each node the moment it starts appearing */
     if(rv>0.12&&!a._seen){ a._seen=true; if(sendPulse&&!REDUCED) sendPulse(a,0.016); }
@@ -761,15 +809,16 @@ function renderPage(cs){
      reverse entry replays the cascade cleanly (arrivalTime restarts each arrival). */
   var lines=pg.querySelectorAll('.ncline');
   for(var k=0;k<lines.length;k++){
-    var th=0.32+k*0.10;
-    var pBased=smooth(th,th+0.08,cs.t);
-    var op=Math.max(pBased, arrivalLine(k));
-    lines[k].style.opacity=op.toFixed(3);
+    /* Eric: NONE of the lines visible on landing, then one at a time. The arrival
+       clock OWNS the copy on card beats (the old P-based floor pre-lit the first
+       two lines at the resting P). arrivalLine returns 0 mid-tween, so nothing
+       shows in flight either; reverse entry replays because arrivalTime restarts. */
+    lines[k].style.opacity=arrivalLine(k).toFixed(3);
   }
   /* the data rails type on AFTER the copy lines: rail arrival begins once the
      last line has landed. Same max(clock, P-based) rebind: the P-based floor is
      the page's own reveal pv so a fast scrub still shows them. */
-  var railProg=Math.max(pv, arrivalRail(lines.length));
+  var railProg=arrivalRail(lines.length); /* arrival-owned too: rails follow the last line, never pre-lit */
   var npl=pg.querySelector('.npl'), npr=pg.querySelector('.npr');
   if(npl) npl.style.opacity=railProg.toFixed(3);
   if(npr) npr.style.opacity=railProg.toFixed(3);
